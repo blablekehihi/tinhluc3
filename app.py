@@ -1,1724 +1,1156 @@
-import React, { useState, useMemo } from 'react';
-import {
-  HelpCircle,
-  Plus,
-  Trash2,
-  ChevronDown,
-  ChevronUp,
-  RefreshCw,
-  Layers,
-  Settings,
-  Flame,
-  Binary,
-  Info,
-  CheckCircle,
-  ToggleLeft,
-  ToggleRight,
-  BookOpen
-} from 'lucide-react';
-import { SubShape, CalculationResult, PresetType } from './types';
-import { calculateSectionProperties, getPresets } from './utils/math';
-import InteractiveCanvas from './components/InteractiveCanvas';
+import streamlit as st
+import math
+import uuid
+import pandas as pd
 
-export default function App() {
-  const presets = useMemo(() => getPresets(), []);
-  
-  // Configuration UI state
-  const [lang, setLang] = useState<'zh' | 'en'>('zh');
-  const [activePreset, setActivePreset] = useState<PresetType | 'custom'>('ibeam');
-  const [shapes, setShapes] = useState<SubShape[]>(presets.ibeam.shapes);
-  const [hoveredShapeId, setHoveredShapeId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'centroid' | 'ix' | 'iy' | 'gyration'>('centroid');
-  const [showGuide, setShowGuide] = useState<boolean>(true);
-  const [expandedShapeId, setExpandedShapeId] = useState<string | null>(null);
+# Set page config with pristine dark-mode friendly custom titles
+st.set_page_config(
+    page_title="Moment of Inertia Calculator",
+    page_icon="📐",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-  // Math results
-  const result: CalculationResult = useMemo(() => {
-    return calculateSectionProperties(shapes);
-  }, [shapes]);
-
-  // Dimension Limits
-  const DIM_LIMITS = {
-    rectWidth: { min: 2, max: 200, step: 1 },
-    rectHeight: { min: 2, max: 200, step: 1 },
-    circleRadius: { min: 2, max: 100, step: 1 },
-    fWidth: { min: 5, max: 200, step: 1 },
-    fThickness: { min: 2, max: 50, step: 1 },
-    wThickness: { min: 2, max: 50, step: 1 },
-    thickness: { min: 1, max: 50, step: 1 },
-    cx: { min: -150, max: 150, step: 1 },
-    cy: { min: -150, max: 150, step: 1 }
-  };
-
-  // Preset activation
-  const handleSelectPreset = (presetKey: PresetType) => {
-    setActivePreset(presetKey);
-    setShapes(JSON.parse(JSON.stringify(presets[presetKey].shapes)));
-    setExpandedShapeId(null);
-  };
-
-  // Add rectangle
-  const handleAddRectangle = () => {
-    const newId = `rect_${Date.now()}`;
-    const newShape: SubShape = {
-      id: newId,
-      name: `Rect ${shapes.length + 1} / 矩形元件 ${shapes.length + 1}`,
-      type: 'rectangle',
-      width: 40,
-      height: 40,
-      radius: 0,
-      cx: 0,
-      cy: 0,
-      isHole: false
-    };
-    setShapes([...shapes, newShape]);
-    setActivePreset('custom');
-    setExpandedShapeId(newId);
-  };
-
-  // Add circle
-  const handleAddCircle = () => {
-    const newId = `circle_${Date.now()}`;
-    const newShape: SubShape = {
-      id: newId,
-      name: `Circle ${shapes.length + 1} / 圓形元件 ${shapes.length + 1}`,
-      type: 'circle',
-      width: 0,
-      height: 0,
-      radius: 20,
-      cx: 0,
-      cy: 0,
-      isHole: false
-    };
-    setShapes([...shapes, newShape]);
-    setActivePreset('custom');
-    setExpandedShapeId(newId);
-  };
-
-  // Add I-Beam
-  const handleAddIBeam = () => {
-    const newId = `ibeam_${Date.now()}`;
-    const newShape: SubShape = {
-      id: newId,
-      name: `I-Beam ${shapes.length + 1} / 工字型鋼 ${shapes.length + 1}`,
-      type: 'ibeam',
-      width: 0,
-      height: 80,
-      radius: 0,
-      fWidth: 60,
-      fThickness: 12,
-      wThickness: 10,
-      cx: 0,
-      cy: 0,
-      isHole: false
-    };
-    setShapes([...shapes, newShape]);
-    setActivePreset('custom');
-    setExpandedShapeId(newId);
-  };
-
-  // Add T-Section
-  const handleAddTSection = () => {
-    const newId = `tsection_${Date.now()}`;
-    const newShape: SubShape = {
-      id: newId,
-      name: `T-Section ${shapes.length + 1} / T型截面 ${shapes.length + 1}`,
-      type: 'tsection',
-      width: 0,
-      height: 80,
-      radius: 0,
-      fWidth: 60,
-      fThickness: 12,
-      wThickness: 10,
-      cx: 0,
-      cy: 0,
-      isHole: false
-    };
-    setShapes([...shapes, newShape]);
-    setActivePreset('custom');
-    setExpandedShapeId(newId);
-  };
-
-  // Add Hollow Rectangle (Box section)
-  const handleAddHollowRect = () => {
-    const newId = `hrect_${Date.now()}`;
-    const newShape: SubShape = {
-      id: newId,
-      name: `Box Sec. ${shapes.length + 1} / 箱型截面 ${shapes.length + 1}`,
-      type: 'hollowrect',
-      width: 60,
-      height: 60,
-      radius: 0,
-      thickness: 6,
-      cx: 0,
-      cy: 0,
-      isHole: false
-    };
-    setShapes([...shapes, newShape]);
-    setActivePreset('custom');
-    setExpandedShapeId(newId);
-  };
-
-  // Add Hollow Circle (Pipe section)
-  const handleAddHollowCircle = () => {
-    const newId = `hcircle_${Date.now()}`;
-    const newShape: SubShape = {
-      id: newId,
-      name: `Pipe Sec. ${shapes.length + 1} / 管型截面 ${shapes.length + 1}`,
-      type: 'hollowcircle',
-      width: 0,
-      height: 0,
-      radius: 30,
-      thickness: 6,
-      cx: 0,
-      cy: 0,
-      isHole: false
-    };
-    setShapes([...shapes, newShape]);
-    setActivePreset('custom');
-    setExpandedShapeId(newId);
-  };
-
-  // Update specific field
-  const handleUpdateShape = (id: string, updates: Partial<SubShape>) => {
-    setShapes(
-      shapes.map((s) => {
-        if (s.id === id) {
-          return { ...s, ...updates };
-        }
-        return s;
-      })
-    );
-    setActivePreset('custom');
-  };
-
-  // Delete shape
-  const handleDeleteShape = (id: string) => {
-    setShapes(shapes.filter((s) => s.id !== id));
-    setActivePreset('custom');
-    if (expandedShapeId === id) setExpandedShapeId(null);
-  };
-
-  // Reset current shapes
-  const handleReset = () => {
-    if (activePreset !== 'custom') {
-      handleSelectPreset(activePreset as PresetType);
-    } else {
-      setShapes([]);
-      setExpandedShapeId(null);
+# Custom css for high contrast engineering dashboard feel
+st.markdown("""
+<style>
+    /* Styling metric custom cards */
+    .metric-card {
+        background-color: #1e293b;
+        border-left: 5px solid #000;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
+        border: 1px solid #334155;
     }
-  };
+    .metric-title {
+        font-size: 11px;
+        text-transform: uppercase;
+        color: #94a3b8;
+        font-weight: bold;
+        letter-spacing: 0.1em;
+        margin-bottom: 4px;
+        font-family: monospace;
+    }
+    .metric-value {
+        font-size: 20px;
+        font-weight: bold;
+        color: #ffffff;
+        font-family: 'Inter', sans-serif;
+    }
+    .metric-unit {
+        font-size: 12px;
+        color: #38bdf8;
+        margin-left: 4px;
+        font-weight: 500;
+    }
+    /* Expander card header tweaking */
+    .st-emotion-cache-1px78ff {
+        background-color: #0f172a !important;
+        border: 1px solid #1e293b !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none antialiased bg-radial-[at_50%_0%] from-slate-900/60 via-slate-950 to-slate-950">
-      {/* HEADER SECTION */}
-      <header className="bg-slate-950/60 backdrop-blur-md border-b border-slate-900 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-3.5 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <div className="flex items-center gap-3">
-            <div className="bg-sky-500/10 border border-sky-500/30 text-sky-400 p-2 rounded-xl shadow-sm flex items-center justify-center">
-              <Layers className="w-5.5 h-5.5 stroke-[2.2]" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-white tracking-tight font-display leading-none">
-                {lang === 'zh' ? '截面慣性矩 智慧教學輔助系統' : 'Section Moment of Inertia Educational Tool'}
-              </h1>
-              <p className="text-xs text-slate-400 mt-1 font-medium font-sans">
-                {lang === 'zh' 
-                  ? '靜力學：工程組合形狀、平行軸定理、形心與回轉半徑一鍵算'
-                  : 'Statics: Compound Shapes, Centroids, Parallel-Axis Theorem & Gyration Radii'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Language option */}
-            <div className="flex bg-slate-900 rounded-xl p-0.5 border border-slate-800">
-              <button
-                onClick={() => setLang('zh')}
-                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                  lang === 'zh'
-                    ? 'bg-slate-800 text-sky-400 border border-slate-700/60 shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-                id="btn-lang-zh"
-              >
-                繁中
-              </button>
-              <button
-                onClick={() => setLang('en')}
-                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                  lang === 'en'
-                    ? 'bg-slate-800 text-sky-400 border border-slate-700/60 shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-                id="btn-lang-en"
-              >
-                EN
-              </button>
-            </div>
-
-            <button
-              onClick={() => setShowGuide(!showGuide)}
-              className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                showGuide 
-                  ? 'bg-sky-500/10 border-sky-500/30 text-sky-400' 
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-              }`}
-              title={lang === 'zh' ? '教程說明' : 'Help / Guide'}
-              id="btn-toggle-guide"
-            >
-              <BookOpen className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:py-6 flex flex-col gap-6">
+# Define bilingual dictionaries
+L = {
+    "English": {
+        "title": "📐 Section Moment of Inertia Calculator",
+        "sub": "An interactive engineering tool for advanced centroid & Parallel Axis Theorem (Ix, Iy) analysis",
+        "lang_select": "Languages / 語言",
+        "preset_sec": "Standard Profiles (Presets)",
+        "preset_label": "Select preset to load:",
+        "preset_loaded": "Preset '{}' successfully loaded!",
+        "custom_label": "Custom Compounds / Free Edit",
+        "shape_list_sec": "📝 Composite Segments List",
+        "add_shape_sec": "➕ Introduce Structural Element",
+        "add_shape_lbl": "Element geometry:",
+        "add_btn_text": "Add Geometry Block",
+        "delete_confirm": "Confirm Delete",
+        "delete": "Delete",
+        "table_shape": "Shape/Element",
+        "table_area": "Area (A)",
+        "table_cx": "cx",
+        "table_cy": "cy",
+        "is_hole_lbl": "Material state:",
+        "solid_opt": "Solid Material (+ Area)",
+        "hole_opt": "Void / Hole (- Area)",
+        "name_lbl": "Label/Name",
+        "pos_sec": "Position / Centers Offsets",
+        "dim_sec": "Structural Dimensions",
+        "b_mm": "Width b (mm)",
+        "h_mm": "Height h (mm)",
+        "r_mm": "Radius r (mm)",
+        "R_mm": "Outer Radius R (mm)",
+        "bf_mm": "Flange Width bf (mm)",
+        "tf_mm": "Flange Thickness tf (mm)",
+        "tw_mm": "Web Thickness tw (mm)",
+        "t_mm": "Wall Thickness t (mm)",
+        "cx_lbl": "cx (X center displacement, mm)",
+        "cy_lbl": "cy (Y center displacement, mm)",
         
-        {/* EDUCATIONAL TOP BANNERS */}
-        {showGuide && (
-          <div className="bg-gradient-to-br from-slate-900/40 via-indigo-950/15 to-slate-900/40 border border-slate-800/80 rounded-2xl p-5 shadow-lg relative overflow-hidden transition-all duration-300">
-            <div className="absolute top-0 right-0 p-3 opacity-[0.03]">
-              <Layers className="w-32 h-32 text-sky-400" />
-            </div>
-            <div className="flex justify-between items-start mb-3">
-              <h3 className="text-xs font-bold text-sky-400 flex items-center gap-1.5 uppercase tracking-wider font-display">
-                <Info className="w-4 h-4 text-sky-400 shrink-0" />
-                {lang === 'zh' ? '靜力學核心學理指南' : 'Key Statics Concept Guide'}
-              </h3>
-              <button 
-                onClick={() => setShowGuide(false)} 
-                className="text-[10px] text-slate-400 hover:text-white font-bold border border-slate-800 rounded-lg px-2 py-0.5 bg-slate-950/60 hover:bg-slate-900 transition-all cursor-pointer"
-                id="btn-close-guide"
-              >
-                {lang === 'zh' ? '隱藏指南' : 'Hide Guide'}
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-[11px] text-slate-450 leading-relaxed font-sans">
-              <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-900/60 shadow-inner">
-                <p className="font-bold text-slate-200 mb-1.5 font-display flex items-center gap-1">
-                  <span className="text-sky-400 font-mono">1.</span> {lang === 'zh' ? '整體形心 (Centroid)' : 'Overall Centroid'}
-                </p>
-                <p className="text-slate-400">
-                  {lang === 'zh' 
-                    ? '截面面積的幾何中心。利用力矩原理計算：X̄ = ∑(A_i·x_i) / ∑A_i 與 Ȳ = ∑(A_i·y_i) / ∑A_i。中空或挖空截面的面積 A_i 與力矩項需取負值計算。'
-                    : 'The geometric center of area. Calculated by weighting parts: X̄ = ∑(A_i·x_i) / ∑A_i and Ȳ = ∑(A_i·y_i) / ∑A_i. Subtracted holes represent negative areas.'}
-                </p>
-              </div>
-              <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-900/60 shadow-inner">
-                <p className="font-bold text-slate-200 mb-1.5 font-display flex items-center gap-1">
-                  <span className="text-indigo-400 font-mono">2.</span> {lang === 'zh' ? '自身慣性矩 (Self Inertia)' : 'Self-Inertia'}
-                </p>
-                <p className="text-slate-400">
-                  {lang === 'zh' 
-                    ? '各子圖形對自身形心軸的慣性矩 I_x0、I_y0。例如矩形為 b·h³/12 (繞水平軸) 及 h·b³/12 (繞垂直軸)；圓形為 π·r⁴/4。'
-                    : "Individual Moment of Inertia about its own centroidal axes. Rectangle: I_x0 = bh³/12 (horizontal) and hb³/12 (vertical). Circle: I_x0 = Iy0 = πr⁴/4."}
-                </p>
-              </div>
-              <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-900/60 shadow-inner">
-                <p className="font-bold text-slate-200 mb-1.5 font-display flex items-center gap-1">
-                  <span className="text-emerald-400 font-mono">3.</span> {lang === 'zh' ? '平行軸定理 (Parallel-Axis)' : 'Parallel-Axis Theorem'}
-                </p>
-                <p className="text-slate-400">
-                  {lang === 'zh' 
-                    ? '重要關係式：I = I_0 + A·d²。將子圖形繞自身形心軸的慣性矩 I_0，轉換至整體形心軸。d 是兩平行軸之間的垂直距離 (dy 或 dx)。'
-                    : 'Relates inertia relative to parallel axes: I = I_0 + Ad². It transfers self-inertia I_0 to the combined centroidal axis. d equals distance between axes.'}
-                </p>
-              </div>
-              <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-900/60 shadow-inner">
-                <p className="font-bold text-slate-200 mb-1.5 font-display flex items-center gap-1">
-                  <span className="text-amber-400 font-mono">4.</span> {lang === 'zh' ? '轉動半徑 (Radius of Gyration)' : 'Radius of Gyration'}
-                </p>
-                <p className="text-slate-400">
-                  {lang === 'zh' 
-                    ? '定義為 r_x = √(I_x / A_total) 與 r_y = √(I_y / A_total)。代表若將截面面積集中在一條線上，此線距形心軸的等效距離。常用於柱挫屈分析。'
-                    : 'The equivalent distance from the centroidal axis defined as r_x = √(I_x / A_total) and r_y = √(I_y / A_total). Crucial for structural buckling analyses.'}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* WORKSPACE ROOT GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          {/* LEFT PANEL: PRESET SELECTOR & SUB-SHAPE MANAGER (lg:col-span-12) */}
-          <div className="lg:col-span-5 flex flex-col gap-6">
-            
-            {/* Presets Card */}
-            <div className="border border-slate-800 bg-slate-900/30 backdrop-blur-md rounded-2xl p-5 shadow-xl shadow-black/20">
-              <h2 className="text-xs font-semibold text-slate-200 flex items-center gap-1.5 mb-3.5 uppercase tracking-wider font-display">
-                <Layers className="w-4 h-4 text-sky-400" />
-                {lang === 'zh' ? '工程常用截面範本' : 'Typical Engineering Sections'}
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-2 gap-2 mb-3">
-                {Object.keys(presets).map((key) => {
-                  const p = presets[key];
-                  const isCur = activePreset === key;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => handleSelectPreset(key as PresetType)}
-                      className={`text-xs text-left p-3 rounded-xl border transition-all flex flex-col justify-between h-[68px] cursor-pointer ${
-                        isCur
-                          ? 'bg-sky-500/10 border-sky-500/55 text-sky-450 font-bold shadow-md shadow-sky-500/5'
-                          : 'bg-slate-950/40 border-slate-900 text-slate-400 hover:bg-slate-900/60 hover:text-slate-200 hover:border-slate-800'
-                      }`}
-                      id={`btn-preset-${key}`}
-                    >
-                      <span className="font-bold text-[11px] sm:text-[11.5px] font-display">
-                        {lang === 'zh' ? p.nameZh : p.nameEn}
-                      </span>
-                      <span className="text-[10px] text-slate-500 truncate block mt-0.5 line-clamp-1 w-full font-sans">
-                        {lang === 'zh' ? p.descZh : p.descEn}
-                      </span>
-                    </button>
-                  );
-                })}
-                <button
-                  onClick={() => {
-                    setActivePreset('custom');
-                    setShapes([]);
-                    setExpandedShapeId(null);
-                  }}
-                  className={`text-xs text-left p-3 rounded-xl border transition-all flex flex-col justify-between h-[68px] cursor-pointer ${
-                    activePreset === 'custom' && shapes.length === 0
-                      ? 'bg-amber-500/10 border-amber-500/55 text-amber-450 font-bold shadow-md shadow-amber-500/5'
-                      : 'bg-slate-950/40 border-slate-900 text-slate-400 hover:bg-slate-900/60 hover:text-slate-200 hover:border-slate-800'
-                  }`}
-                  id="btn-preset-custom-empty"
-                >
-                  <span className="font-bold flex items-center gap-1 text-[11px] sm:text-[11.5px] text-slate-300 font-display">
-                    ⭐ {lang === 'zh' ? '自訂空面板' : 'Custom Empty'}
-                  </span>
-                  <span className="text-[10px] text-slate-500 truncate block mt-0.5 font-sans">
-                    {lang === 'zh' ? '從零開始自由排布' : 'Start building from scratch'}
-                  </span>
-                </button>
-              </div>
-
-              {/* Active description */}
-              {activePreset !== 'custom' && (
-                <div className="bg-slate-950/40 border border-slate-900 p-3 rounded-xl text-[11px] leading-relaxed text-slate-400 flex items-start gap-1.5 font-sans mt-3">
-                  <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-                  <span>
-                    <strong className="text-slate-300">{lang === 'zh' ? '範本描述：' : 'Description: '}</strong>
-                    {lang === 'zh' ? presets[activePreset as PresetType].descZh : presets[activePreset as PresetType].descEn}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Custom Sub-Shapes Builder */}
-            <div className="border border-slate-800 bg-slate-900/30 backdrop-blur-md rounded-2xl p-5 shadow-xl shadow-black/20 flex flex-col gap-4">
-              <div className="flex justify-between items-center bg-slate-950/40 -mx-5 -mt-5 px-5 py-4 border-b border-slate-800/80 rounded-t-2xl">
-                <div>
-                  <h2 className="text-sm font-semibold text-slate-100 flex items-center gap-1.5 uppercase tracking-wide font-display">
-                    <Settings className="w-4 h-4 text-sky-400" />
-                    {lang === 'zh' ? '組合截面元件管理器' : 'Interactive Shape Builder'}
-                  </h2>
-                  <p className="text-[11px] text-slate-500 font-medium mt-1 font-sans">
-                    {lang === 'zh' 
-                      ? '自訂各單獨元件形狀、尺寸和相對於 (0,0) 的位置座標' 
-                      : 'Customize dimensions & locations about local origin (0,0)'}
-                  </p>
-                </div>
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={handleReset}
-                    className="p-1 px-3 border border-slate-800 rounded-lg text-[10px] uppercase tracking-wider font-semibold font-mono bg-slate-950/60 text-slate-400 hover:text-white hover:bg-slate-900 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
-                    title={lang === 'zh' ? '重置為當前範本' : 'Reset to current preset'}
-                    id="btn-reset-shape"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    {lang === 'zh' ? '重置' : 'Reset'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Components List */}
-              <div className="flex flex-col gap-3 max-h-[380px] overflow-y-auto pr-1">
-                {shapes.length === 0 ? (
-                  <div className="text-center py-10 border-2 border-dashed border-slate-850 rounded-xl text-slate-500 bg-slate-950/15">
-                    <p className="text-xs font-semibold mb-1 text-slate-400">
-                      {lang === 'zh' ? '沒有任何截面元件' : 'No sections defined'}
-                    </p>
-                    <p className="text-[10px] text-slate-550">
-                      {lang === 'zh' ? '請點擊下方按鈕加入矩形或圓形，或選用預設範本' : 'Click buttons below to add Rectangles or Circles.'}
-                    </p>
-                  </div>
-                ) : (
-                  shapes.map((shape, idx) => {
-                    const isExpanded = expandedShapeId === shape.id;
-                    const indexLabel = idx + 1;
-                    return (
-                      <div
-                        key={shape.id}
-                        className={`border rounded-xl transition-all ${
-                          hoveredShapeId === shape.id
-                            ? 'border-sky-500 bg-slate-900/40 shadow-xs'
-                            : isExpanded
-                            ? 'border-slate-800 bg-slate-900/20'
-                            : 'border-slate-900 bg-slate-950/30 hover:border-slate-800 hover:bg-slate-900/10'
-                        }`}
-                        onMouseEnter={() => setHoveredShapeId(shape.id)}
-                        onMouseLeave={() => setHoveredShapeId(null)}
-                        id={`item-shape-card-${shape.id}`}
-                      >
-                        {/* Summary Row */}
-                        <div
-                          onClick={() => setExpandedShapeId(isExpanded ? null : shape.id)}
-                          className="flex items-center justify-between p-3 cursor-pointer select-none"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="w-5.5 h-5.5 flex items-center justify-center rounded-lg bg-slate-950 border border-slate-900 text-[10px] font-bold text-slate-400 font-mono">
-                              {indexLabel}
-                            </span>
-                            <div className="text-xs">
-                              <div className="font-bold text-slate-200 flex items-center gap-1.5 font-display">
-                                <span>
-                                  {shape.type === 'rectangle'
-                                    ? (lang === 'zh' ? `矩形 (${shape.width} × ${shape.height})` : `Rect (${shape.width}×${shape.height})`)
-                                    : (lang === 'zh' ? `圓形 (r = ${shape.radius})` : `Circle (r=${shape.radius})`)}
-                                </span>
-                                {shape.isHole && (
-                                  <span className="bg-rose-500/10 border border-rose-505/30 text-rose-450 text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider">
-                                    {lang === 'zh' ? '中空 / 減' : 'Hole'}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                                Position: ({shape.cx}, {shape.cy})
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={() => {
-                                handleUpdateShape(shape.id, { isHole: !shape.isHole });
-                              }}
-                              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                                shape.isHole
-                                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 hover:bg-rose-500/25'
-                                  : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-350'
-                              }`}
-                              title={lang === 'zh' ? '切換實心 / 中空' : 'Toggle Solid / Hole'}
-                              id={`shape-toggle-hole-${shape.id}`}
-                            >
-                              <Binary className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteShape(shape.id)}
-                              className="p-1.5 rounded-lg border border-slate-800 text-slate-500 hover:text-rose-400 hover:border-rose-550/40 hover:bg-rose-500/10 bg-slate-955 cursor-pointer transition-all"
-                              title={lang === 'zh' ? '刪除元件' : 'Delete part'}
-                              id={`shape-delete-${shape.id}`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => setExpandedShapeId(isExpanded ? null : shape.id)}
-                              className="p-1 rounded text-slate-500 hover:text-slate-350 transition-all cursor-pointer"
-                            >
-                              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Detailed Editor Panel */}
-                        {isExpanded && (
-                          <div className="border-t border-slate-900/60 p-4 bg-slate-950/45 rounded-b-xl flex flex-col gap-3.5 text-xs text-slate-300">
-                            {/* Shape Name Input */}
-                            <div>
-                              <label className="block text-[9px] font-bold text-slate-550 uppercase tracking-widest mb-1.5 font-mono">
-                                {lang === 'zh' ? '元件自訂標籤 (英文/中文)' : 'Name Flag'}
-                              </label>
-                              <input
-                                type="text"
-                                className="w-full border border-slate-900 bg-slate-950 px-2.5 py-1.5 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-sky-500/60 font-semibold"
-                                value={shape.name}
-                                onChange={(e) => handleUpdateShape(shape.id, { name: e.target.value })}
-                                id={`input-name-${shape.id}`}
-                              />
-                            </div>
-
-                            {/* Shape Dimensions Sliders */}
-                            {shape.type === 'rectangle' && (
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                    <span className="font-bold text-slate-400">{lang === 'zh' ? '寬度 b (X向)' : 'Width b'}</span>
-                                    <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.width} mm</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={DIM_LIMITS.rectWidth.min}
-                                    max={DIM_LIMITS.rectWidth.max}
-                                    step={DIM_LIMITS.rectWidth.step}
-                                    value={shape.width}
-                                    onChange={(e) => handleUpdateShape(shape.id, { width: parseInt(e.target.value) })}
-                                    className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                    id={`slider-width-${shape.id}`}
-                                  />
-                                </div>
-                                <div>
-                                  <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                    <span className="font-bold text-slate-400">{lang === 'zh' ? '高度 h (Y向)' : 'Height h'}</span>
-                                    <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.height} mm</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={DIM_LIMITS.rectHeight.min}
-                                    max={DIM_LIMITS.rectHeight.max}
-                                    step={DIM_LIMITS.rectHeight.step}
-                                    value={shape.height}
-                                    onChange={(e) => handleUpdateShape(shape.id, { height: parseInt(e.target.value) })}
-                                    className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                    id={`slider-height-${shape.id}`}
-                                  />
-                                </div>
-                              </div>
-                            )}
-
-                            {shape.type === 'circle' && (
-                              <div>
-                                <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                  <span className="font-bold text-slate-400">{lang === 'zh' ? '半徑 r' : 'Radius r'}</span>
-                                  <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.radius} mm</span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min={DIM_LIMITS.circleRadius.min}
-                                  max={DIM_LIMITS.circleRadius.max}
-                                  step={DIM_LIMITS.circleRadius.step}
-                                  value={shape.radius}
-                                  onChange={(e) => handleUpdateShape(shape.id, { radius: parseInt(e.target.value) })}
-                                  className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                  id={`slider-radius-${shape.id}`}
-                                />
-                              </div>
-                            )}
-
-                            {shape.type === 'ibeam' && (
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                    <span className="font-bold text-slate-400">{lang === 'zh' ? '總高度 h' : 'Total Height h'}</span>
-                                    <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.height} mm</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={DIM_LIMITS.rectHeight.min}
-                                    max={DIM_LIMITS.rectHeight.max}
-                                    step={DIM_LIMITS.rectHeight.step}
-                                    value={shape.height}
-                                    onChange={(e) => handleUpdateShape(shape.id, { height: parseInt(e.target.value) })}
-                                    className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                    id={`slider-height-${shape.id}`}
-                                  />
-                                </div>
-                                <div>
-                                  <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                    <span className="font-bold text-slate-400">{lang === 'zh' ? '翼網寬 bf' : 'Flange Width bf'}</span>
-                                    <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.fWidth ?? 60} mm</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={DIM_LIMITS.fWidth.min}
-                                    max={DIM_LIMITS.fWidth.max}
-                                    step={DIM_LIMITS.fWidth.step}
-                                    value={shape.fWidth ?? 60}
-                                    onChange={(e) => handleUpdateShape(shape.id, { fWidth: parseInt(e.target.value) })}
-                                    className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                    id={`slider-fwidth-${shape.id}`}
-                                  />
-                                </div>
-                                <div>
-                                  <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                    <span className="font-bold text-slate-400">{lang === 'zh' ? '翼網厚 tf' : 'Flange Thick tf'}</span>
-                                    <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.fThickness ?? 12} mm</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={DIM_LIMITS.fThickness.min}
-                                    max={DIM_LIMITS.fThickness.max}
-                                    step={DIM_LIMITS.fThickness.step}
-                                    value={shape.fThickness ?? 12}
-                                    onChange={(e) => handleUpdateShape(shape.id, { fThickness: parseInt(e.target.value) })}
-                                    className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                    id={`slider-fthick-${shape.id}`}
-                                  />
-                                </div>
-                                <div>
-                                  <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                    <span className="font-bold text-slate-400">{lang === 'zh' ? '腹網厚 tw' : 'Web Thick tw'}</span>
-                                    <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.wThickness ?? 10} mm</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={DIM_LIMITS.wThickness.min}
-                                    max={DIM_LIMITS.wThickness.max}
-                                    step={DIM_LIMITS.wThickness.step}
-                                    value={shape.wThickness ?? 10}
-                                    onChange={(e) => handleUpdateShape(shape.id, { wThickness: parseInt(e.target.value) })}
-                                    className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                    id={`slider-wthick-${shape.id}`}
-                                  />
-                                </div>
-                              </div>
-                            )}
-
-                            {shape.type === 'tsection' && (
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                    <span className="font-bold text-slate-400">{lang === 'zh' ? '總高度 H' : 'Total Height H'}</span>
-                                    <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.height} mm</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={DIM_LIMITS.rectHeight.min}
-                                    max={DIM_LIMITS.rectHeight.max}
-                                    step={DIM_LIMITS.rectHeight.step}
-                                    value={shape.height}
-                                    onChange={(e) => handleUpdateShape(shape.id, { height: parseInt(e.target.value) })}
-                                    className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                    id={`slider-height-${shape.id}`}
-                                  />
-                                </div>
-                                <div>
-                                  <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                    <span className="font-bold text-slate-400">{lang === 'zh' ? '翼板寬 bf' : 'Flange Width bf'}</span>
-                                    <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.fWidth ?? 60} mm</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={DIM_LIMITS.fWidth.min}
-                                    max={DIM_LIMITS.fWidth.max}
-                                    step={DIM_LIMITS.fWidth.step}
-                                    value={shape.fWidth ?? 60}
-                                    onChange={(e) => handleUpdateShape(shape.id, { fWidth: parseInt(e.target.value) })}
-                                    className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                    id={`slider-fwidth-${shape.id}`}
-                                  />
-                                </div>
-                                <div>
-                                  <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                    <span className="font-bold text-slate-400">{lang === 'zh' ? '翼板厚 tf' : 'Flange Thick tf'}</span>
-                                    <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.fThickness ?? 12} mm</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={DIM_LIMITS.fThickness.min}
-                                    max={DIM_LIMITS.fThickness.max}
-                                    step={DIM_LIMITS.fThickness.step}
-                                    value={shape.fThickness ?? 12}
-                                    onChange={(e) => handleUpdateShape(shape.id, { fThickness: parseInt(e.target.value) })}
-                                    className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                    id={`slider-fthick-${shape.id}`}
-                                  />
-                                </div>
-                                <div>
-                                  <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                    <span className="font-bold text-slate-400">{lang === 'zh' ? '腹板厚 tw' : 'Web Thick tw'}</span>
-                                    <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.wThickness ?? 10} mm</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={DIM_LIMITS.wThickness.min}
-                                    max={DIM_LIMITS.wThickness.max}
-                                    step={DIM_LIMITS.wThickness.step}
-                                    value={shape.wThickness ?? 10}
-                                    onChange={(e) => handleUpdateShape(shape.id, { wThickness: parseInt(e.target.value) })}
-                                    className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                    id={`slider-wthick-${shape.id}`}
-                                  />
-                                </div>
-                              </div>
-                            )}
-
-                            {shape.type === 'hollowrect' && (
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                    <span className="font-bold text-slate-400">{lang === 'zh' ? '外寬度 b' : 'Outer Width b'}</span>
-                                    <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.width} mm</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={DIM_LIMITS.rectWidth.min}
-                                    max={DIM_LIMITS.rectWidth.max}
-                                    step={DIM_LIMITS.rectWidth.step}
-                                    value={shape.width}
-                                    onChange={(e) => handleUpdateShape(shape.id, { width: parseInt(e.target.value) })}
-                                    className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                    id={`slider-width-${shape.id}`}
-                                  />
-                                </div>
-                                <div>
-                                  <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                    <span className="font-bold text-slate-400">{lang === 'zh' ? '外高度 h' : 'Outer Height h'}</span>
-                                    <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.height} mm</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={DIM_LIMITS.rectHeight.min}
-                                    max={DIM_LIMITS.rectHeight.max}
-                                    step={DIM_LIMITS.rectHeight.step}
-                                    value={shape.height}
-                                    onChange={(e) => handleUpdateShape(shape.id, { height: parseInt(e.target.value) })}
-                                    className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                    id={`slider-height-${shape.id}`}
-                                  />
-                                </div>
-                                <div className="col-span-2">
-                                  <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                    <span className="font-bold text-slate-400">{lang === 'zh' ? '壁厚 t' : 'Wall Thick t'}</span>
-                                    <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.thickness ?? 6} mm</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={DIM_LIMITS.thickness.min}
-                                    max={DIM_LIMITS.thickness.max}
-                                    step={DIM_LIMITS.thickness.step}
-                                    value={shape.thickness ?? 6}
-                                    onChange={(e) => handleUpdateShape(shape.id, { thickness: parseInt(e.target.value) })}
-                                    className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                    id={`slider-thick-${shape.id}`}
-                                  />
-                                </div>
-                              </div>
-                            )}
-
-                            {shape.type === 'hollowcircle' && (
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                    <span className="font-bold text-slate-400">{lang === 'zh' ? '外半徑 R' : 'Outer Rad R'}</span>
-                                    <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.radius} mm</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={DIM_LIMITS.circleRadius.min}
-                                    max={DIM_LIMITS.circleRadius.max}
-                                    step={DIM_LIMITS.circleRadius.step}
-                                    value={shape.radius}
-                                    onChange={(e) => handleUpdateShape(shape.id, { radius: parseInt(e.target.value) })}
-                                    className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                    id={`slider-radius-${shape.id}`}
-                                  />
-                                </div>
-                                <div>
-                                  <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                    <span className="font-bold text-slate-400">{lang === 'zh' ? '壁厚 t' : 'Wall Thick t'}</span>
-                                    <span className="font-mono text-sky-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.thickness ?? 6} mm</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min={DIM_LIMITS.thickness.min}
-                                    max={DIM_LIMITS.thickness.max}
-                                    step={DIM_LIMITS.thickness.step}
-                                    value={shape.thickness ?? 6}
-                                    onChange={(e) => handleUpdateShape(shape.id, { thickness: parseInt(e.target.value) })}
-                                    className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-400"
-                                    id={`slider-thick-${shape.id}`}
-                                  />
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Centroid Offsets Sliders */}
-                            <div className="grid grid-cols-2 gap-3 pt-1.5 border-t border-slate-900/60">
-                              <div>
-                                <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                  <span className="font-bold text-slate-400">{lang === 'zh' ? '心座標 cx (x_i)' : 'Center cx'}</span>
-                                  <span className="font-mono text-amber-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.cx > 0 ? `+${shape.cx}` : shape.cx} mm</span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min={DIM_LIMITS.cx.min}
-                                  max={DIM_LIMITS.cx.max}
-                                  step={DIM_LIMITS.cx.step}
-                                  value={shape.cx}
-                                  onChange={(e) => handleUpdateShape(shape.id, { cx: parseInt(e.target.value) })}
-                                  className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-450"
-                                  id={`slider-cx-${shape.id}`}
-                                />
-                              </div>
-                              <div>
-                                <div className="flex justify-between text-[10.5px] mb-1 font-sans">
-                                  <span className="font-bold text-slate-400">{lang === 'zh' ? '心座標 cy (y_i)' : 'Center cy'}</span>
-                                  <span className="font-mono text-amber-400 font-bold bg-slate-950/80 border border-slate-900 px-1.5 py-0.2 rounded">{shape.cy > 0 ? `+${shape.cy}` : shape.cy} mm</span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min={DIM_LIMITS.cy.min}
-                                  max={DIM_LIMITS.cy.max}
-                                  step={DIM_LIMITS.cy.step}
-                                  value={shape.cy}
-                                  onChange={(e) => handleUpdateShape(shape.id, { cy: parseInt(e.target.value) })}
-                                  className="w-full h-1 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-450"
-                                  id={`slider-cy-${shape.id}`}
-                                />
-                              </div>
-                            </div>
-                            
-                            {/* Manual numerical input fields */}
-                            <div className="grid grid-cols-4 gap-2 text-[10.5px] font-sans pt-1 border-t border-slate-900/40">
-                              {shape.type === 'rectangle' && (
-                                <>
-                                  <div>
-                                    <label className="text-slate-500 block mb-0.5 font-mono text-[9px] uppercase font-bold tracking-wider">b (mm)</label>
-                                    <input 
-                                      type="number" 
-                                      value={shape.width} 
-                                      className="w-full border border-slate-900 bg-slate-950 px-1 py-1 rounded text-center text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-                                      onChange={(e) => handleUpdateShape(shape.id, { width: Math.max(1, Math.min(500, parseInt(e.target.value) || 1)) })}
-                                      id={`num-b-${shape.id}`}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-slate-500 block mb-0.5 font-mono text-[9px] uppercase font-bold tracking-wider">h (mm)</label>
-                                    <input 
-                                      type="number" 
-                                      value={shape.height} 
-                                      className="w-full border border-slate-900 bg-slate-950 px-1 py-1 rounded text-center text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-                                      onChange={(e) => handleUpdateShape(shape.id, { height: Math.max(1, Math.min(500, parseInt(e.target.value) || 1)) })}
-                                      id={`num-h-${shape.id}`}
-                                    />
-                                  </div>
-                                </>
-                              )}
-                              {shape.type === 'circle' && (
-                                <div className="col-span-2">
-                                  <label className="text-slate-500 block mb-0.5 font-mono text-[9px] uppercase font-bold tracking-wider">r (mm)</label>
-                                  <input 
-                                    type="number" 
-                                    value={shape.radius} 
-                                    className="w-full border border-slate-900 bg-slate-950 px-1 py-1 rounded text-center text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-                                    onChange={(e) => handleUpdateShape(shape.id, { radius: Math.max(1, Math.min(250, parseInt(e.target.value) || 1)) })}
-                                    id={`num-r-${shape.id}`}
-                                  />
-                                </div>
-                              )}
-                              {(shape.type === 'ibeam' || shape.type === 'tsection') && (
-                                <>
-                                  <div>
-                                    <label className="text-slate-500 block mb-0.5 font-mono text-[9px] uppercase font-bold tracking-wider">h (mm)</label>
-                                    <input 
-                                      type="number" 
-                                      value={shape.height} 
-                                      className="w-full border border-slate-900 bg-slate-950 px-1 py-1 rounded text-center text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-                                      onChange={(e) => handleUpdateShape(shape.id, { height: Math.max(1, Math.min(500, parseInt(e.target.value) || 1)) })}
-                                      id={`num-h-${shape.id}`}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-slate-500 block mb-0.5 font-mono text-[9px] uppercase font-bold tracking-wider">bf (mm)</label>
-                                    <input 
-                                      type="number" 
-                                      value={shape.fWidth ?? 60} 
-                                      className="w-full border border-slate-900 bg-slate-950 px-1 py-1 rounded text-center text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-                                      onChange={(e) => handleUpdateShape(shape.id, { fWidth: Math.max(1, Math.min(500, parseInt(e.target.value) || 1)) })}
-                                      id={`num-bf-${shape.id}`}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-slate-400 block mb-0.5 font-mono text-[8px] uppercase font-bold tracking-wider">tf (mm)</label>
-                                    <input 
-                                      type="number" 
-                                      value={shape.fThickness ?? 12} 
-                                      className="w-full border border-slate-900 bg-slate-950 px-1 py-1 rounded text-center text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-                                      onChange={(e) => handleUpdateShape(shape.id, { fThickness: Math.max(1, Math.min(250, parseInt(e.target.value) || 1)) })}
-                                      id={`num-tf-${shape.id}`}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-slate-400 block mb-0.5 font-mono text-[8px] uppercase font-bold tracking-wider">tw (mm)</label>
-                                    <input 
-                                      type="number" 
-                                      value={shape.wThickness ?? 10} 
-                                      className="w-full border border-slate-900 bg-slate-950 px-1 py-1 rounded text-center text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-                                      onChange={(e) => handleUpdateShape(shape.id, { wThickness: Math.max(1, Math.min(250, parseInt(e.target.value) || 1)) })}
-                                      id={`num-tw-${shape.id}`}
-                                    />
-                                  </div>
-                                </>
-                              )}
-                              {shape.type === 'hollowrect' && (
-                                <>
-                                  <div>
-                                    <label className="text-slate-500 block mb-0.5 font-mono text-[9px] uppercase font-bold tracking-wider">b (mm)</label>
-                                    <input 
-                                      type="number" 
-                                      value={shape.width} 
-                                      className="w-full border border-slate-900 bg-slate-950 px-1 py-1 rounded text-center text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-                                      onChange={(e) => handleUpdateShape(shape.id, { width: Math.max(1, Math.min(500, parseInt(e.target.value) || 1)) })}
-                                      id={`num-b-${shape.id}`}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-slate-500 block mb-0.5 font-mono text-[9px] uppercase font-bold tracking-wider">h (mm)</label>
-                                    <input 
-                                      type="number" 
-                                      value={shape.height} 
-                                      className="w-full border border-slate-900 bg-slate-950 px-1 py-1 rounded text-center text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-                                      onChange={(e) => handleUpdateShape(shape.id, { height: Math.max(1, Math.min(500, parseInt(e.target.value) || 1)) })}
-                                      id={`num-h-${shape.id}`}
-                                    />
-                                  </div>
-                                  <div className="col-span-2">
-                                    <label className="text-slate-400 block mb-0.5 font-mono text-[9px] uppercase font-bold tracking-wider">t (mm)</label>
-                                    <input 
-                                      type="number" 
-                                      value={shape.thickness ?? 6} 
-                                      className="w-full border border-slate-900 bg-slate-950 px-1 py-1 rounded text-center text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-                                      onChange={(e) => handleUpdateShape(shape.id, { thickness: Math.max(1, Math.min(100, parseInt(e.target.value) || 1)) })}
-                                      id={`num-t-${shape.id}`}
-                                    />
-                                  </div>
-                                </>
-                              )}
-                              {shape.type === 'hollowcircle' && (
-                                <>
-                                  <div className="col-span-2">
-                                    <label className="text-slate-500 block mb-0.5 font-mono text-[9px] uppercase font-bold tracking-wider">R (mm)</label>
-                                    <input 
-                                      type="number" 
-                                      value={shape.radius} 
-                                      className="w-full border border-slate-900 bg-slate-950 px-1 py-1 rounded text-center text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-                                      onChange={(e) => handleUpdateShape(shape.id, { radius: Math.max(1, Math.min(250, parseInt(e.target.value) || 1)) })}
-                                      id={`num-R-${shape.id}`}
-                                    />
-                                  </div>
-                                  <div className="col-span-2">
-                                    <label className="text-slate-400 block mb-0.5 font-mono text-[9px] uppercase font-bold tracking-wider">t (mm)</label>
-                                    <input 
-                                      type="number" 
-                                      value={shape.thickness ?? 6} 
-                                      className="w-full border border-slate-900 bg-slate-950 px-1 py-1 rounded text-center text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-                                      onChange={(e) => handleUpdateShape(shape.id, { thickness: Math.max(1, Math.min(100, parseInt(e.target.value) || 1)) })}
-                                      id={`num-t-${shape.id}`}
-                                    />
-                                  </div>
-                                </>
-                              )}
-                              <div>
-                                <label className="text-slate-500 block mb-0.5 font-mono text-[9px] uppercase font-bold tracking-wider">X-offset</label>
-                                <input 
-                                  type="number" 
-                                  value={shape.cx} 
-                                  className="w-full border border-slate-900 bg-slate-950 px-1 py-1 rounded text-center text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-                                  onChange={(e) => handleUpdateShape(shape.id, { cx: Math.max(-500, Math.min(500, parseInt(e.target.value) || 0)) })}
-                                  id={`num-cx-${shape.id}`}
-                                />
-                              </div>
-                              <div>
-                                <label className="text-slate-500 block mb-0.5 font-mono text-[9px] uppercase font-bold tracking-wider">Y-offset</label>
-                                <input 
-                                  type="number" 
-                                  value={shape.cy} 
-                                  className="w-full border border-slate-900 bg-slate-950 px-1 py-1 rounded text-center text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-                                  onChange={(e) => handleUpdateShape(shape.id, { cy: Math.max(-500, Math.min(500, parseInt(e.target.value) || 0)) })}
-                                  id={`num-cy-${shape.id}`}
-                                />
-                              </div>
-                            </div>
-
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              {/* Add Elements Buttons Block */}
-              <div className="grid grid-cols-2 gap-2.5 pt-3 border-t border-slate-900">
-                <button
-                  onClick={handleAddRectangle}
-                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-sky-500/30 bg-sky-500/5 text-sky-400 font-bold hover:bg-sky-500/10 text-xs transition-colors cursor-pointer shadow-2xs"
-                  id="btn-add-rect"
-                >
-                  <Plus className="w-4 h-4 stroke-[2.2]" />
-                  {lang === 'zh' ? '加入矩形元件' : 'Add Rectangle'}
-                </button>
-                <button
-                  onClick={handleAddCircle}
-                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-indigo-500/30 bg-indigo-50/5 text-indigo-400 font-bold hover:bg-indigo-500/10 text-xs transition-colors cursor-pointer shadow-2xs"
-                  id="btn-add-circle"
-                >
-                  <Plus className="w-4 h-4 stroke-[2.2]" />
-                  {lang === 'zh' ? '加入圓形元件' : 'Add Circle'}
-                </button>
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* RIGHT PANEL: VISUALIZATION CANVAS & INTEGRATED MECHANICAL OUTPUT (lg:col-span-7) */}
-          <div className="lg:col-span-7 flex flex-col gap-6">
-
-            {/* Split viewport layout for canvas and fast dashboard parameters */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
-              
-              {/* Profile Canvas Drawing (col-span-12 md:col-span-7) */}
-              <div className="md:col-span-7 flex flex-col justify-between">
-                <InteractiveCanvas
-                  shapes={shapes}
-                  centroid={result.centroid}
-                  hoveredId={hoveredShapeId}
-                  onHoverShape={setHoveredShapeId}
-                  lang={lang}
-                />
-              </div>
-
-              {/* Fast Output summary Dashboard card (col-span-12 md:col-span-5) */}
-              <div className="md:col-span-5 flex flex-col gap-4">
-                
-                <div className="border border-slate-800 bg-slate-900/30 backdrop-blur-md rounded-2xl p-5 shadow-xl shadow-black/20 flex-1 flex flex-col justify-between relative overflow-hidden">
-                  {/* Subtle technical background grid accent */}
-                  <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:16px_16px] opacity-10 pointer-events-none"></div>
-
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between border-b border-slate-900 pb-2.5 mb-3">
-                      <span className="text-[10px] font-bold text-slate-450 tracking-wider uppercase font-mono">
-                        {lang === 'zh' ? '整體幾何特徵' : 'Global Section Properties'}
-                      </span>
-                      <span className="flex h-2 w-2 relative">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                      </span>
-                    </div>
-
-                    {/* Area Summary */}
-                    <div className="my-2.5 text-slate-300">
-                      <span className="text-[11px] font-medium block text-slate-400 font-sans">
-                        {lang === 'zh' ? '1. 總截面面積 (A_total)' : 'Total Cross Area Area (A)'}
-                      </span>
-                      <div className="flex items-baseline gap-1 mt-0.5">
-                        <span className="text-2xl font-bold font-mono text-white tracking-tight">
-                          {result.centroid.totalArea.toLocaleString('en-US', { maximumFractionDigits: 1 })}
-                        </span>
-                        <span className="text-[10px] text-slate-500 font-mono">mm²</span>
-                      </div>
-                    </div>
-
-                    {/* Centroid coordinates dashboard */}
-                    <div className="my-3.5 text-slate-300">
-                      <span className="text-[11px] font-medium block text-slate-400 font-sans">
-                        {lang === 'zh' ? '2. 整體形心位置 G (X̄, Ȳ)' : 'Overall Centroid G (X̄, Ȳ)'}
-                      </span>
-                      <div className="flex gap-4 mt-1.5 font-mono">
-                        <div className="bg-slate-950/60 px-3.5 py-1.5 rounded-xl border border-slate-900 flex-1">
-                          <span className="text-[9px] text-slate-550 block uppercase font-bold tracking-wide">X̄ (Horizontal)</span>
-                          <span className="text-base font-bold text-amber-455">
-                            {result.centroid.x.toFixed(2)} <span className="text-[10px] text-slate-600 font-normal">mm</span>
-                          </span>
-                        </div>
-                        <div className="bg-slate-950/60 px-3.5 py-1.5 rounded-xl border border-slate-900 flex-1">
-                          <span className="text-[9px] text-slate-550 block uppercase font-bold tracking-wide">Ȳ (Vertical)</span>
-                          <span className="text-base font-bold text-amber-455">
-                            {result.centroid.y.toFixed(2)} <span className="text-[10px] text-slate-600 font-normal">mm</span>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Warning on Negative Area */}
-                  {result.centroid.totalArea <= 0 && shapes.length > 0 && (
-                    <div className="bg-rose-950/30 border border-rose-900/50 rounded-xl px-3 py-2 text-[10px] text-rose-300 relative z-10 leading-relaxed mb-3">
-                       ❌ {lang === 'zh' ? '警告：組合面積小於或等於零，物理上不合理，請減少挖空 (Hole) 尺寸或增加主截面尺寸。' : 'Warning: Total area <= 0. Holes must be smaller than the main body.'}
-                    </div>
-                  )}
-
-                  <div className="border-t border-slate-900 pt-3 relative z-10 flex flex-col gap-2">
-                    <span className="text-[10px] font-bold text-slate-455 tracking-wider uppercase font-mono">
-                      {lang === 'zh' ? '形心慣性矩 I (平移後值)' : 'Moments of Inertia to Centroidal axes'}
-                    </span>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 text-slate-300 font-mono">
-                      <div className="bg-sky-500/10 border border-sky-500/20 rounded-xl p-2.5 text-center">
-                        <span className="text-[9px] text-slate-455 block uppercase font-bold tracking-wide">Ix (Horizontal)</span>
-                        <span className="text-base font-bold text-sky-400">
-                          {result.totalIx.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </span>
-                        <span className="text-[9px] text-slate-505 block mt-0.5">mm⁴</span>
-                      </div>
-                      <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-2.5 text-center">
-                        <span className="text-[9px] text-slate-455 block uppercase font-bold tracking-wide">Iy (Vertical)</span>
-                        <span className="text-base font-bold text-indigo-400">
-                          {result.totalIy.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </span>
-                        <span className="text-[9px] text-slate-505 block mt-0.5">mm⁴</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Radii of Gyration card */}
-                <div className="border border-slate-800 bg-slate-900/20 backdrop-blur-md rounded-2xl p-5 shadow-lg">
-                  <span className="text-[10px] font-bold text-slate-455 block uppercase tracking-wider mb-2.5 font-mono">
-                    {lang === 'zh' ? '回轉半徑 (Radius of Gyration)' : 'Radius of Gyration'}
-                  </span>
-                  <div className="grid grid-cols-2 gap-3 text-slate-300 font-mono">
-                    <div className="bg-slate-950/50 border border-slate-900/60 p-3 rounded-xl flex flex-col justify-center">
-                      <span className="text-[10px] text-slate-500 block font-mono">rx = √(Ix / A)</span>
-                      <div className="flex items-baseline gap-1 mt-0.5">
-                        <span className="text-md font-bold text-slate-200">
-                          {result.rx.toFixed(3)}
-                        </span>
-                        <span className="text-[10px] text-slate-500">mm</span>
-                      </div>
-                    </div>
-                    <div className="bg-slate-950/50 border border-slate-900/60 p-3 rounded-xl flex flex-col justify-center">
-                      <span className="text-[10px] text-slate-550 block font-mono">ry = √(Iy / A)</span>
-                      <div className="flex items-baseline gap-1 mt-0.5">
-                        <span className="text-md font-bold text-slate-200">
-                          {result.ry.toFixed(3)}
-                        </span>
-                        <span className="text-[10px] text-slate-550">mm</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
-        {/* BOTTOM SECTION: DETAILED STEP-BY-STEP CALCULATION DISSECTION & FORMULAS (FULL WIDTH) */}
-        <div className="border border-slate-800 bg-slate-900/40 backdrop-blur-md rounded-2xl shadow-xl shadow-black/20 overflow-hidden">
-          
-          <div className="bg-slate-950/80 text-slate-100 p-5 border-b border-slate-900 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <div>
-              <h2 className="text-sm font-bold flex items-center gap-2 uppercase tracking-wider font-sans text-sky-450">
-                <Binary className="w-4 h-4 text-sky-400 shrink-0" />
-                {lang === 'zh' ? '學生分步驗算與公式推導區' : 'Bilingual Interactive Step-by-Step Calculation Logger'}
-              </h2>
-              <p className="text-[11px] text-slate-450 mt-1 font-sans">
-                {lang === 'zh' 
-                  ? '本區完整揭露形心和平行軸定理的每一步代入，供您人工算對照、核對學期作業或考題。' 
-                  : 'Full transparency of algebraic plugging-in for easy verification, homework comparisons, and exam studies.'}
-              </p>
-            </div>
-            
-            {/* Step Selection Tabs */}
-            <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800/80 max-w-full overflow-x-auto">
-              {(['centroid', 'ix', 'iy', 'gyration'] as const).map((tab) => {
-                const labelsZh = { centroid: '1. 形心座標', ix: '2. 繞X迴轉 Ix', iy: '3. 繞Y迴轉 Iy', gyration: '4. 迴轉半徑' };
-                const labelsEn = { centroid: '1. Centroid', ix: '2. Moment Ix', iy: '3. Moment Iy', gyration: '4. Radius r' };
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
-                      activeTab === tab
-                        ? 'bg-sky-500 text-slate-950 font-bold shadow-md shadow-sky-500/10'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                    }`}
-                    id={`btn-tab-${tab}`}
-                  >
-                    {lang === 'zh' ? labelsZh[tab] : labelsEn[tab]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="p-5">
-            {/* TAB 1: CENTROID STEP-BY-STEP CALCULATION */}
-            {activeTab === 'centroid' && (
-              <div className="flex flex-col gap-4">
-                <div className="bg-slate-950/40 border border-slate-800/60 rounded-xl p-4 text-xs leading-relaxed text-slate-300">
-                  <h4 className="font-bold text-slate-100 mb-1.5 flex items-center gap-1.5">
-                    <CheckCircle className="w-4 h-4 text-sky-400" />
-                    {lang === 'zh' ? '幾何形心計算公式說理' : 'Centroid Algebraic Method'}
-                  </h4>
-                  <p className="mb-2 text-slate-400">
-                    {lang === 'zh' 
-                      ? '要計算整體複合圖形的重心(形心)，我們將其拆為多個簡單子元件 A_i。利用斷面一次矩(First Moment of Area)平衡原理：' 
-                      : 'To calculate the centroid (geometric center) of a composite section, split it into basic parts. Balancing moments of area:'}
-                  </p>
-                  
-                  {/* Styled elegant Fractions for Centroid */}
-                  <div className="flex flex-col sm:flex-row gap-6 my-4 items-center justify-center bg-slate-950 border border-slate-900 p-4 rounded-xl shadow-inner max-w-sm sm:max-w-md mx-auto">
-                    <div className="flex items-center gap-2 text-xs font-mono">
-                      <span className="font-bold text-sky-400">X̄ = </span>
-                      <span className="inline-flex flex-col items-center justify-center text-center">
-                        <span className="border-b border-slate-700 px-3 pb-0.5 font-bold text-slate-200">∑(A_i · x_i)</span>
-                        <span className="pt-0.5 font-bold text-slate-200">∑A_i</span>
-                      </span>
-                    </div>
-                    <div className="hidden sm:block border-l border-slate-805 h-8"></div>
-                    <div className="flex items-center gap-2 text-xs font-mono">
-                      <span className="font-bold text-sky-400">Ȳ = </span>
-                      <span className="inline-flex flex-col items-center justify-center text-center">
-                        <span className="border-b border-slate-700 px-3 pb-0.5 font-bold text-slate-200">∑(A_i · y_i)</span>
-                        <span className="pt-0.5 font-bold text-slate-250">∑A_i</span>
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-slate-400">
-                    {lang === 'zh'
-                      ? '注意：對於挖空或中空元件（Hole），其面積 A_i 的數值為「負值」，對對應的一般力矩也是扣減關係。'
-                      : 'Note: Areas of hollow cutouts and holes are negative, meaning they correctly subtract from the overall area and moment sums.'}
-                  </p>
-                </div>
-
-                <div className="overflow-x-auto border border-slate-800 rounded-xl bg-slate-950/40">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-slate-950/80 text-slate-400 font-bold border-b border-slate-900 font-mono text-[10px] uppercase tracking-wider">
-                        <th className="p-3 w-12 text-center">#</th>
-                        <th className="p-3">{lang === 'zh' ? '元件名稱' : 'Component Name'}</th>
-                        <th className="p-3">{lang === 'zh' ? '類型' : 'Shape'}</th>
-                        <th className="p-3 text-right">{lang === 'zh' ? '面積 A_i (mm²)' : 'Area A_i (mm²)'}</th>
-                        <th className="p-3 text-right">{lang === 'zh' ? 'x_i (mm)' : 'Centroid x_i (mm)'}</th>
-                        <th className="p-3 text-right">{lang === 'zh' ? 'y_i (mm)' : 'Centroid y_i (mm)'}</th>
-                        <th className="p-3 text-right text-sky-400 bg-sky-950/10">{lang === 'zh' ? 'A_i · x_i (mm³)' : 'Moment A_i·x_i (mm³)'}</th>
-                        <th className="p-3 text-right text-indigo-400 bg-indigo-950/10">{lang === 'zh' ? 'A_i · y_i (mm³)' : 'Moment A_i·y_i (mm³)'}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.rows.map((row, idx) => (
-                        <tr
-                          key={row.id}
-                          className={`border-b border-slate-900/60 hover:bg-slate-900/40 transition-colors ${
-                            hoveredShapeId === row.id ? 'bg-sky-500/5' : ''
-                          }`}
-                          onMouseEnter={() => setHoveredShapeId(row.id)}
-                          onMouseLeave={() => setHoveredShapeId(null)}
-                        >
-                          <td className="p-3 text-center font-mono font-bold text-slate-500">{idx + 1}</td>
-                          <td className="p-3 font-semibold text-slate-200">{row.name}</td>
-                          <td className="p-3">
-                            <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold text-slate-950 font-mono ${
-                              row.isHole ? 'bg-rose-500/80' : row.type === 'rectangle' ? 'bg-sky-400' : 'bg-indigo-400'
-                            }`}>
-                              {row.isHole ? 'hole/挖空' : row.type}
-                            </span>
-                          </td>
-                          <td className={`p-3 text-right font-mono ${row.isHole ? 'text-rose-450 font-semibold' : 'text-slate-300'}`}>
-                            {row.isHole ? '-' : ''}{Math.abs(row.area).toFixed(1)}
-                          </td>
-                          <td className="p-3 text-right font-mono text-slate-400">{row.cx}</td>
-                          <td className="p-3 text-right font-mono text-slate-400">{row.cy}</td>
-                          <td className="p-3 text-right font-mono bg-sky-500/5 text-sky-400">
-                            {(row.area * row.cx).toFixed(1)}
-                          </td>
-                          <td className="p-3 text-right font-mono bg-indigo-500/5 text-indigo-405">
-                            {(row.area * row.cy).toFixed(1)}
-                          </td>
-                        </tr>
-                      ))}
-                      {/* Sums Row */}
-                      <tr className="bg-slate-950 text-white font-bold font-mono">
-                        <td colSpan={3} className="p-3 text-right">
-                          {lang === 'zh' ? '總和 (∑)：' : 'Sum Total (∑):'}
-                        </td>
-                        <td className="p-3 text-right text-emerald-400">
-                          {result.centroid.totalArea.toFixed(1)}
-                        </td>
-                        <td colSpan={2} className="p-3"></td>
-                        <td className="p-3 text-right text-sky-400 bg-sky-950/20">
-                          {result.rows.reduce((acc, r) => acc + (r.area * r.cx), 0).toFixed(1)}
-                        </td>
-                        <td className="p-3 text-right text-indigo-405 bg-indigo-950/20">
-                          {result.rows.reduce((acc, r) => acc + (r.area * r.cy), 0).toFixed(1)}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Combined Equations step */}
-                <div className="bg-slate-950/50 rounded-xl p-4 font-mono text-xs border border-slate-900 mt-2 flex flex-col gap-3 text-slate-300">
-                  <div className="font-bold text-slate-400 border-b border-slate-900 pb-1.5 flex items-center justify-between">
-                    <span>💡 {lang === 'zh' ? '代入數值推導步驟' : 'Calculations Step-by-Step:'}</span>
-                    <span className="text-[10px] text-slate-600 font-sans">Values in standard units</span>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <div>
-                      <span className="text-sky-400 font-bold">1. {lang === 'zh' ? '計算總面積 Sum of Area' : 'Total Area sum'}:</span>
-                      <p className="mt-1 font-sans text-slate-400 bg-slate-950/40 p-2.5 rounded-lg border border-slate-900">
-                        A_total = {result.centroid.steps.totalAreaFormula} = <strong className="text-white">{result.centroid.totalArea.toFixed(2)}</strong> mm²
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                      <div>
-                        <span className="text-emerald-400 font-bold">2. {lang === 'zh' ? '水平形心座標 X̄ (對 Y 軸之矩)' : 'Horizontal Centroid X̄ (relative to origin):'}</span>
-                        <p className="mt-1 font-sans text-slate-400 bg-slate-950/40 p-2.5 rounded-lg border border-slate-900 leading-loose">
-                          X̄ = ∑(A_i·x_i) / ∑A_i <br />
-                          X̄ = {result.centroid.steps.xBarFormula} <br />
-                          X̄ = <strong className="text-amber-400 text-sm font-mono">{result.centroid.x.toFixed(4)} mm</strong>
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-indigo-455 font-bold">3. {lang === 'zh' ? '垂直形心座標 Ȳ (對 X 軸之矩)' : 'Vertical Centroid Ȳ (relative to origin):'}</span>
-                        <p className="mt-1 font-sans text-slate-400 bg-slate-950/40 p-2.5 rounded-lg border border-slate-900 leading-loose">
-                          Ȳ = ∑(A_i·y_i) / ∑A_i <br />
-                          Ȳ = {result.centroid.steps.yBarFormula} <br />
-                          Ȳ = <strong className="text-amber-400 text-sm font-mono">{result.centroid.y.toFixed(4)} mm</strong>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 2: MOMENT ix VIA PARALLEL-AXIS THEOREM */}
-            {activeTab === 'ix' && (
-              <div className="flex flex-col gap-4">
-                <div className="bg-slate-950/40 border border-slate-800/60 rounded-xl p-4 text-xs leading-relaxed text-slate-350">
-                  <h4 className="font-bold text-slate-100 mb-1.5 flex items-center gap-1.5">
-                    <CheckCircle className="w-4 h-4 text-sky-400" />
-                    {lang === 'zh' ? '水平慣性矩 Ix 的平行軸定理' : 'Parallel Axis Theorem for Ix'}
-                  </h4>
-                  <p className="mb-2 text-slate-400">
-                    {lang === 'zh'
-                      ? '繞水平形心軸的慣性矩 Ix 代表「抵抗繞 X 方向彎曲（垂直位移）」的能力。對於每一個組合元件 i，利用平行軸定理轉換：'
-                      : 'The moment of inertia around the horizontal axis (Ix) measures the resistance against horizontal axis bending. Using Parallel Axis Theorem:'}
-                  </p>
-                  
-                  {/* Styled Math Fractions for Ix Parallel Axis Theorem */}
-                  <div className="flex flex-col items-center justify-center bg-slate-950 border border-slate-900 p-4 rounded-xl shadow-inner max-w-sm mx-auto my-3 text-xs leading-relaxed">
-                    <div className="font-semibold font-mono text-center text-slate-200">
-                      Ix = ∑( I_x0,i + A_i · dy,i² )
-                    </div>
-                    <div className="text-[10px] text-slate-500 mt-2 font-medium text-center">
-                      {lang === 'zh' 
-                        ? 'dy,i = (y_i - Ȳ) 是元件形心至整體形心的垂直距離 (mm)' 
-                        : 'dy,i = (y_i - Ȳ) is the vertical distance from sub-centroid to global Y-centroid.'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto border border-slate-800 rounded-xl bg-slate-950/40">
-                  <table className="w-full text-left text-xs border-collapse font-sans">
-                    <thead>
-                      <tr className="bg-slate-950/80 text-slate-400 font-bold border-b border-slate-900 font-mono text-[10px] uppercase tracking-wider">
-                        <th className="p-3 w-12 text-center">#</th>
-                        <th className="p-3">{lang === 'zh' ? '元件名稱' : 'Component Name'}</th>
-                        <th className="p-3 text-right">{lang === 'zh' ? '自身慣性矩 I_x0 (mm⁴)' : 'Self-Inertia I_x0 (mm⁴)'}</th>
-                        <th className="p-3 text-right">{lang === 'zh' ? '面積 A_i (mm²)' : 'Area A_i (mm²)'}</th>
-                        <th className="p-3 text-right">{lang === 'zh' ? '垂直距離 dy (mm)' : 'Vertical d_y (mm)'}</th>
-                        <th className="p-3 text-right">{lang === 'zh' ? '平移項 A · dy² (mm⁴)' : 'Ad_y² Term (mm⁴)'}</th>
-                        <th className="p-3 text-right text-sky-400 bg-sky-950/10">{lang === 'zh' ? '總合 I_x,i (mm⁴)' : 'Total I_x,i (mm⁴)'}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.rows.map((row, idx) => (
-                        <tr
-                          key={row.id}
-                          className={`border-b border-slate-900/60 hover:bg-slate-900/40 transition-colors ${
-                            hoveredShapeId === row.id ? 'bg-sky-500/5' : ''
-                          }`}
-                          onMouseEnter={() => setHoveredShapeId(row.id)}
-                          onMouseLeave={() => setHoveredShapeId(null)}
-                        >
-                          <td className="p-3 text-center font-mono font-bold text-slate-500">{idx + 1}</td>
-                          <td className="p-3">
-                            <div className="font-semibold text-slate-200">{row.name}</div>
-                            <div className="text-[10px] text-slate-500 font-mono mt-1">{row.ix0Formula}</div>
-                          </td>
-                          <td className={`p-3 text-right font-mono ${row.isHole ? 'text-rose-400' : 'text-slate-355'}`}>
-                            {row.ix0.toLocaleString('en-US', { maximumFractionDigits: 1 })}
-                          </td>
-                          <td className={`p-3 text-right font-mono ${row.isHole ? 'text-rose-400' : 'text-slate-355'}`}>
-                            {row.area.toFixed(1)}
-                          </td>
-                          {/* dy = cy - Ȳ */}
-                          <td className="p-3 text-right font-mono text-slate-400">
-                            {row.dx.toFixed(2)}
-                          </td>
-                          <td className={`p-3 text-right font-mono ${row.isHole ? 'text-rose-450' : 'text-slate-400'}`}>
-                            {row.adx2.toLocaleString('en-US', { maximumFractionDigits: 1 })}
-                          </td>
-                          <td className="p-3 text-right font-mono bg-sky-500/5 font-bold text-sky-400">
-                            {row.ixTotal.toLocaleString('en-US', { maximumFractionDigits: 1 })}
-                          </td>
-                        </tr>
-                      ))}
-                      {/* Overall Integration sum */}
-                      <tr className="bg-slate-950 text-white font-bold font-mono">
-                        <td colSpan={2} className="p-3 text-right">
-                          {lang === 'zh' ? '整體慣性矩 Ix = ∑(I_x0 + A_i·dy²) ：' : 'Total Moment of Inertia Ix = ∑(I_x0 + A·dy²):'}
-                        </td>
-                        <td className="p-3 text-right text-slate-500">
-                          {result.rows.reduce((acc, r) => acc + r.ix0, 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </td>
-                        <td className="p-3 text-right text-slate-500">
-                          {result.centroid.totalArea.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </td>
-                        <td className="p-3"></td>
-                        <td className="p-3 text-right text-slate-500">
-                          {result.rows.reduce((acc, r) => acc + r.adx2, 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </td>
-                        <td className="p-3 text-right text-sky-400 bg-sky-950/20 font-bold">
-                          {result.totalIx.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="bg-slate-950/50 rounded-xl p-4 font-mono text-xs border border-slate-900 mt-2">
-                  <span className="font-bold text-slate-400 block mb-2">📝 {lang === 'zh' ? '每元件代入細化算式 (數學驗證)' : 'Algebraic Breakdown of Each Part for Ix:'}</span>
-                  <div className="flex flex-col gap-2 bg-slate-950/40 p-3 rounded-lg border border-slate-900 font-sans text-slate-400 leading-relaxed text-xs">
-                    {result.rows.map((row, idx) => (
-                      <div key={row.id} className="border-b border-dashed border-slate-900 pb-2 last:border-0 last:pb-0">
-                        <strong className="text-slate-200">元件 {idx + 1} ({row.name})：</strong> <br />
-                        <span className="font-mono text-slate-500 pl-4 inline-block mt-1">
-                          I_x{idx + 1} = I_x0 + A·d² <br />
-                          I_x{idx + 1} = ({row.ix0.toFixed(1)}) + ({row.area.toFixed(1)}) · ({row.dx.toFixed(2)})² <br />
-                          I_x{idx + 1} = {row.ix0.toFixed(1)} + {row.adx2.toFixed(1)} = <strong className="text-amber-400">{row.ixTotal.toFixed(1)} mm⁴</strong>
-                        </span>
-                      </div>
-                    ))}
-                    <div className="border-t border-slate-900 pt-2 font-bold text-slate-350 flex justify-between mt-1 font-mono">
-                      <span>{lang === 'zh' ? '∑ Ix 累計加總 =' : 'Combined Sum Ix ='}</span>
-                      <span className="text-sky-450 text-sm">
-                        {result.rows.map((r, i) => `${r.ixTotal >= 0 && i !== 0 ? '+' : ''}${r.ixTotal.toFixed(0)}`).join(' ')} = 
-                        <strong className="ml-1 text-base underline text-sky-400">{result.totalIx.toLocaleString('en-US', { maximumFractionDigits: 1 })} mm⁴</strong>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            )}
-
-            {/* TAB 3: MOMENT iy VIA PARALLEL-AXIS THEOREM */}
-            {activeTab === 'iy' && (
-              <div className="flex flex-col gap-4">
-                <div className="bg-slate-950/40 border border-slate-800/60 rounded-xl p-4 text-xs leading-relaxed text-slate-350">
-                  <h4 className="font-bold text-slate-100 mb-1.5 flex items-center gap-1.5 font-sans">
-                    <CheckCircle className="w-4 h-4 text-sky-400" />
-                    {lang === 'zh' ? '垂直慣性矩 Iy 的平行軸定理' : 'Parallel Axis Theorem for Iy'}
-                  </h4>
-                  <p className="mb-2 text-slate-400">
-                    {lang === 'zh'
-                      ? '繞垂直形心軸的慣性矩 Iy 代表「抵抗繞 Y 方向彎曲（水平位移）」的能力。利用平行軸定理將子慣性矩轉化：'
-                      : 'The moment of inertia around the vertical axis (Iy) measures the resistance against horizontal bending. Using parallel axis transfer:'}
-                  </p>
-
-                  <div className="flex flex-col items-center justify-center bg-slate-950 border border-slate-900 p-4 rounded-xl shadow-inner max-w-sm mx-auto my-3 text-xs leading-relaxed">
-                    <div className="font-semibold font-mono text-center text-slate-200">
-                      Iy = ∑( I_y0,i + A_i · dx,i² )
-                    </div>
-                    <div className="text-[10px] text-slate-500 mt-2 font-medium text-center">
-                      {lang === 'zh' 
-                        ? 'dx,i = (x_i - X̄) 是元件形心至整體形心的水平距離 (mm)' 
-                        : 'dx,i = (x_i - X̄) is the horizontal distance from sub-centroid to global X-centroid.'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto border border-slate-800 rounded-xl bg-slate-950/40">
-                  <table className="w-full text-left text-xs border-collapse font-sans">
-                    <thead>
-                      <tr className="bg-slate-950/80 text-slate-400 font-bold border-b border-slate-900 font-mono text-[10px] uppercase tracking-wider">
-                        <th className="p-3 w-12 text-center">#</th>
-                        <th className="p-3">{lang === 'zh' ? '元件名稱' : 'Component Name'}</th>
-                        <th className="p-3 text-right">{lang === 'zh' ? '自身慣性矩 I_y0 (mm⁴)' : 'Self-Inertia I_y0 (mm⁴)'}</th>
-                        <th className="p-3 text-right">{lang === 'zh' ? '面積 A_i (mm²)' : 'Area A_i (mm²)'}</th>
-                        <th className="p-3 text-right">{lang === 'zh' ? '水平距離 dx (mm)' : 'Horizontal d_x (mm)'}</th>
-                        <th className="p-3 text-right">{lang === 'zh' ? '平移項 A · dx² (mm⁴)' : 'Ad_x² Term (mm⁴)'}</th>
-                        <th className="p-3 text-right text-indigo-400 bg-indigo-950/10">{lang === 'zh' ? '總合 I_y,i (mm⁴)' : 'Total I_y,i (mm⁴)'}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.rows.map((row, idx) => (
-                        <tr
-                          key={row.id}
-                          className={`border-b border-slate-900/60 hover:bg-slate-900/40 transition-colors ${
-                            hoveredShapeId === row.id ? 'bg-sky-500/5' : ''
-                          }`}
-                          onMouseEnter={() => setHoveredShapeId(row.id)}
-                          onMouseLeave={() => setHoveredShapeId(null)}
-                        >
-                          <td className="p-3 text-center font-mono font-bold text-slate-500">{idx + 1}</td>
-                          <td className="p-3">
-                            <div className="font-semibold text-slate-200">{row.name}</div>
-                            <div className="text-[10px] text-slate-500 font-mono mt-1">{row.iy0Formula}</div>
-                          </td>
-                          <td className={`p-3 text-right font-mono ${row.isHole ? 'text-rose-400' : 'text-slate-355'}`}>
-                            {row.iy0.toLocaleString('en-US', { maximumFractionDigits: 1 })}
-                          </td>
-                          <td className={`p-3 text-right font-mono ${row.isHole ? 'text-rose-400' : 'text-slate-355'}`}>
-                            {row.area.toFixed(1)}
-                          </td>
-                          {/* dx = cx - X̄ */}
-                          <td className="p-3 text-right font-mono text-slate-400">
-                            {row.dy.toFixed(2)}
-                          </td>
-                          <td className={`p-3 text-right font-mono ${row.isHole ? 'text-rose-450' : 'text-slate-400'}`}>
-                            {row.ady2.toLocaleString('en-US', { maximumFractionDigits: 1 })}
-                          </td>
-                          <td className="p-3 text-right font-mono bg-indigo-500/5 font-bold text-indigo-400">
-                            {row.iyTotal.toLocaleString('en-US', { maximumFractionDigits: 1 })}
-                          </td>
-                        </tr>
-                      ))}
-                      {/* Sum row */}
-                      <tr className="bg-slate-950 text-white font-bold font-mono">
-                        <td colSpan={2} className="p-3 text-right">
-                          {lang === 'zh' ? '整體慣性矩 Iy = ∑(I_y0 + A_i·dx²) ：' : 'Total Moment of Inertia Iy = ∑(I_y0 + A·dx²):'}
-                        </td>
-                        <td className="p-3 text-right text-slate-500">
-                          {result.rows.reduce((acc, r) => acc + r.iy0, 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </td>
-                        <td className="p-3 text-right text-slate-500">
-                          {result.centroid.totalArea.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </td>
-                        <td className="p-3"></td>
-                        <td className="p-3 text-right text-slate-500">
-                          {result.rows.reduce((acc, r) => acc + r.ady2, 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </td>
-                        <td className="p-3 text-right text-indigo-400 bg-indigo-950/20 font-bold">
-                          {result.totalIy.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="bg-slate-950/50 rounded-xl p-4 font-mono text-xs border border-slate-900 mt-2">
-                  <span className="font-bold text-slate-400 block mb-2">📝 {lang === 'zh' ? '每元件代入細化算式 (數學驗證)' : 'Algebraic Breakdown of Each Part for Iy:'}</span>
-                  <div className="flex flex-col gap-2 bg-slate-950/40 p-3 rounded-lg border border-slate-900 font-sans text-slate-400 leading-relaxed text-xs">
-                    {result.rows.map((row, idx) => (
-                      <div key={row.id} className="border-b border-dashed border-slate-900 pb-2 last:border-0 last:pb-0">
-                        <strong className="text-slate-200">元件 {idx + 1} ({row.name})：</strong> <br />
-                        <span className="font-mono text-slate-500 pl-4 inline-block mt-1">
-                          I_y{idx + 1} = I_y0 + A·d² <br />
-                          I_y{idx + 1} = ({row.iy0.toFixed(1)}) + ({row.area.toFixed(1)}) · ({row.dy.toFixed(2)})² <br />
-                          I_y{idx + 1} = {row.iy0.toFixed(1)} + {row.ady2.toFixed(1)} = <strong className="text-indigo-400">{row.iyTotal.toFixed(1)} mm⁴</strong>
-                        </span>
-                      </div>
-                    ))}
-                    <div className="border-t border-slate-900 pt-2 font-bold text-slate-355 flex justify-between mt-1 font-mono">
-                      <span>{lang === 'zh' ? '∑ Iy 累計加總 =' : 'Combined Sum Iy ='}</span>
-                      <span className="text-indigo-400 text-sm">
-                        {result.rows.map((r, i) => `${r.iyTotal >= 0 && i !== 0 ? '+' : ''}${r.iyTotal.toFixed(0)}`).join(' ')} = 
-                        <strong className="ml-1 text-base underline text-indigo-400">{result.totalIy.toLocaleString('en-US', { maximumFractionDigits: 1 })} mm⁴</strong>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            )}
-
-            {/* TAB 4: RADII OF GYRATION CALCULATIONS */}
-            {activeTab === 'gyration' && (
-              <div className="flex flex-col gap-4 text-xs text-slate-700 leading-relaxed">
-                <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-4 font-sans text-slate-700">
-                  <h4 className="font-bold text-slate-900 mb-1 flex items-center gap-1">
-                    <CheckCircle className="w-4 h-4 text-blue-600 font-bold" />
-                    {lang === 'zh' ? '迴轉半徑 (轉動半徑) 數值代入算式' : 'Radius of Gyration Formula Proof'}
-                  </h4>
-                  <p className="mb-3">
-                    {lang === 'zh'
-                      ? '迴轉半徑（Radius of Gyration，用 r 或 k 表示）描述了面積分布對其形心軸之分散程度。常用於結構挫屈（Buckling）計算，迴轉半徑越小，說明在此方向越容易發生壓曲失穩。'
-                      : 'The radius of gyration characterizes the distribution of an area about its centroidal axis. If an entire area could be concentrated at a discrete distance r, it would yield the same inertia.'}
-                  </p>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-4">
-                    <div className="bg-slate-950 border border-slate-900 p-4 rounded-xl shadow-inner flex flex-col items-center">
-                      <span className="font-bold text-sky-400 mb-2 font-mono text-[10px] uppercase tracking-wider">rx = √(Ix / A)</span>
-                      <div className="font-mono text-center flex flex-col gap-1 text-slate-400">
-                        <div>rx = √({result.totalIx.toLocaleString('en-US', { maximumFractionDigits: 1 })} / {result.centroid.totalArea.toLocaleString('en-US', { maximumFractionDigits: 1 })})</div>
-                        <div>rx = √({(result.totalIx / (result.centroid.totalArea || 1)).toFixed(3)})</div>
-                        <div className="text-amber-400 font-bold text-sm mt-1">rx = {result.rx.toFixed(4)} mm</div>
-                      </div>
-                    </div>
-                    <div className="bg-slate-950 border border-slate-900 p-4 rounded-xl shadow-inner flex flex-col items-center">
-                      <span className="font-bold text-sky-400 mb-2 font-mono text-[10px] uppercase tracking-wider">ry = √(Iy / A)</span>
-                      <div className="font-mono text-center flex flex-col gap-1 text-slate-400">
-                        <div>ry = √({result.totalIy.toLocaleString('en-US', { maximumFractionDigits: 1 })} / {result.centroid.totalArea.toLocaleString('en-US', { maximumFractionDigits: 1 })})</div>
-                        <div>ry = √({(result.totalIy / (result.centroid.totalArea || 1)).toFixed(3)})</div>
-                        <div className="text-amber-400 font-bold text-sm mt-1">ry = {result.ry.toFixed(4)} mm</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 bg-slate-950/60 p-4 rounded-xl border border-slate-900 leading-normal text-slate-350">
-                    <h5 className="font-bold text-emerald-400 mb-1.5 flex items-center gap-1.5 font-sans tracking-wide">
-                      💡 {lang === 'zh' ? '工程學啟示與分析' : 'Engineering Insights:'}
-                    </h5>
-                    {result.rx > result.ry ? (
-                      <p>
-                        {lang === 'zh' 
-                          ? `此截面的 rx (${result.rx.toFixed(2)} mm) 大於 ry (${result.ry.toFixed(2)} mm)。這代表在受壓荷載作用下，該結構梁/柱在繞 Y 軸（水平位移、平面內左-右彎曲）的方向更為脆弱，發生挫屈時將優先向弱軸（即迴轉半徑較小的 Y 軸）發生彎曲。`
-                          : `The radius of gyration rx (${result.rx.toFixed(2)} mm) is strictly larger than ry (${result.ry.toFixed(2)} mm). Under vertical axial compression, column buckling will occur preferentially about the weak axis: the Y axis (minor axis with the smallest gyration radius).`}
-                      </p>
-                    ) : result.ry > result.rx ? (
-                      <p>
-                        {lang === 'zh' 
-                          ? `此截面的 ry (${result.ry.toFixed(2)} mm) 大於 rx (${result.rx.toFixed(2)} mm)。這代表在受壓荷載作用下，該結構在繞 X 軸（垂直位移、平面內上-下彎曲）的方向更為脆弱，壓彎挫屈時將優先發生弱軸方向（即 X 軸）失穩。`
-                          : `The radius of gyration ry (${result.ry.toFixed(2)} mm) is strictly larger than rx (${result.rx.toFixed(2)} mm). Under axial load, buckling will preferentially occur about the weak axis: the X axis (minor axis with the smallest gyration radius).`}
-                      </p>
-                    ) : (
-                      <p>
-                        {lang === 'zh'
-                          ? '此截面的 rx 與 ry 完全相等！說明它具有軸向對稱剛度分佈。在任意方向受壓時，發生挫屈的機率均等。圓形、正方形、同心圆中空管通常具備此良好特性。'
-                          : 'The radii of gyration are exactly identical in both axes! This column/beam offers equal structural stability against buckling in all lateral directions (e.g. perfect symmetric circles/squares).'}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          
-        </div>
-
-        {/* COMPREHENSIVE TEXTBOOK HELP FAQ BANNER */}
-        <div className="border border-slate-800 bg-slate-900/20 backdrop-blur-md rounded-2xl p-6 text-xs text-slate-400">
-          <h3 className="font-bold text-slate-200 mb-4 uppercase tracking-wider flex items-center gap-1.5 font-mono text-[11px] text-sky-400">
-            <HelpCircle className="w-4 h-4 text-sky-450" />
-            {lang === 'zh' ? '靜力學截面特性常見問與答 (FAQ)' : 'Frequently Asked Questions (FAQ)'}
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 leading-relaxed">
-            <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-900/60">
-              <p className="font-bold text-slate-200 mb-2 text-[13px] text-sky-400">
-                Q1: {lang === 'zh' ? '如果我在大圓內心挖一個等圓，慣性矩會是零嗎？' : 'What happens if a hole is placed exactly at the center with equal size?'}
-              </p>
-              <p className="text-slate-400">
-                {lang === 'zh'
-                  ? '是的。本系統支持負面積（挖空元件）。如果內孔半徑與外圓形相同（等心且尺寸重合），其總面積、總慣性矩將被扣減至 0。'
-                  : 'Yes. Since holes use negative algebra, putting a hole overlapping the main body with equal sizes yields exactly 0 net area and 0 inertia.'}
-              </p>
-            </div>
-            <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-900/60">
-              <p className="font-bold text-slate-200 mb-2 text-[13px] text-sky-400">
-                Q2: {lang === 'zh' ? '什麼是慣性半徑/轉動半徑，為什麼用它而不光看慣性矩？' : 'Why use Radius of Gyration instead of just Moment of Inertia?'}
-              </p>
-              <p className="text-slate-400">
-                {lang === 'zh'
-                  ? '慣性矩為長度的四次方(mm⁴)，不便於直接與截面尺寸對比。轉動半徑為長度單位(mm)，直觀表徵了面積對抗彎曲的「等效半徑」，可用於歐拉公式確定長柱的細長比。'
-                  : "Moment of Inertia has units of L⁴ (mm⁴), which is complex for cross-section dimension ratios. Radius of gyration is in mm, allowing simple slenderness ratio verification for columns."}
-              </p>
-            </div>
-          </div>
-        </div>
-
-      </main>
-
-      {/* FOOTER */}
-      <footer className="bg-slate-950/40 border-t border-slate-900 mt-auto py-5 text-center text-xs text-slate-500 font-mono">
-        <div>
-          Section Moment of Inertia Calculator &copy; 2026. Made with React & Tailwind CSS.
-        </div>
-      </footer>
-    </div>
-  );
+        "tab_summary": "📊 Properties Summary",
+        "tab_centroid_steps": "📐 Centroid Analytical Steps",
+        "tab_pat_steps": "⛓️ Parallel Axis Theorem Matrix",
+        
+        "total_area": "Combined Area",
+        "centroid_u": "Composite Centroid Axis",
+        "ix_lbl": "Moment of Inertia Ix",
+        "iy_lbl": "Moment of Inertia Iy",
+        "rx_lbl": "Radius of Gyration rx",
+        "ry_lbl": "Radius of Gyration ry",
+        
+        "canvas_title": "Interactive Section View",
+        "scale_desc": "Scale coordinate mesh updated live with standard reference axes.",
+        "steps_desc": "Subshape parameters are evaluated step-by-step to calculate centroid (X̄, Ȳ) and section Moments of Inertia components.",
+        "empty_warning": "No geometry components loaded. Choose a Preset in the left sidebar or click 'Add Geometry Block' to create one!",
+        "formulas_centroid": "1. Centroidal Neutral Axes Calculation",
+        "formulas_moi": "2. Moments of Inertia with Parallel Axis Correction (Ix, Iy)",
+        "theory_text": "The composite neutrality parameters are obtained via static area moments, and the composite major inertia properties are combined using the Parallel-Axis Theorem: $I = I_{0} + A d^2$."
+    },
+    "繁體中文": {
+        "title": "📐 截面形心與慣性矩計算器",
+        "sub": "基於平行軸定理（Parallel Axis Theorem）的複雜截面幾何與慣性矩（Ix, Iy）力學分析系統",
+        "lang_select": "Languages / 語言",
+        "preset_sec": "標準工程固體截面預設",
+        "preset_label": "選擇欲載入的預設：",
+        "preset_loaded": "已成功載入預設： '{}'！",
+        "custom_label": "自由設計 / 自定義多重複合",
+        "shape_list_sec": "📝 各子幾何元件編輯清單",
+        "add_shape_sec": "➕ 新增截面元件",
+        "add_shape_lbl": "截面幾何形狀：",
+        "add_btn_text": "新增截面元件",
+        "delete_confirm": "確認刪除元件",
+        "delete": "刪除",
+        "table_shape": "幾何形狀/元件",
+        "table_area": "面積 (A)",
+        "table_cx": "X軸偏移 cx",
+        "table_cy": "Y軸偏移 cy",
+        "is_hole_lbl": "材料實體狀態：",
+        "solid_opt": "實體材質 (+ 面積/剛度)",
+        "hole_opt": "中空開孔 (- 面積/扣減)",
+        "name_lbl": "元件名稱/標記",
+        "pos_sec": "幾何中心偏移位置 (Displacement)",
+        "dim_sec": "元件結構幾何尺寸 (Measurements)",
+        "b_mm": "寬度 b (mm)",
+        "h_mm": "高度 h (mm)",
+        "r_mm": "半徑 r (mm)",
+        "R_mm": "外圓半徑 R (mm)",
+        "bf_mm": "翼板寬度 bf (mm)",
+        "tf_mm": "翼板厚度 tf (mm)",
+        "tw_mm": "腹板厚度 tw (mm)",
+        "t_mm": "管/箱壁厚度 t (mm)",
+        "cx_lbl": "cx (X向偏移 displacements, mm)",
+        "cy_lbl": "cy (Y向偏移 displacements, mm)",
+        
+        "tab_summary": "📊 數據計算總覽",
+        "tab_centroid_steps": "📐 形心理論詳解步驟",
+        "tab_pat_steps": "⛓️ 平行軸定理矩陣表格",
+        
+        "total_area": "截面總面積 (A)",
+        "centroid_u": "複合幾何中心形心 (X̄, Ȳ)",
+        "ix_lbl": "主要慣性矩 Ix",
+        "iy_lbl": "主要慣性矩 Iy",
+        "rx_lbl": "迴轉半徑 (慣性半徑) rx",
+        "ry_lbl": "迴轉半徑 (慣性半徑) ry",
+        
+        "canvas_title": "交互式截面視覺圖檔",
+        "scale_desc": "自動按比例縮放幾何，網格代表標註，實體元件顯示為色塊，而扣減孔洞則疊加斜向網格線標記。",
+        "steps_desc": "系統會根據各子形狀對 (0, 0) 的力矩疊加來計算主形心 (X̄, Ȳ)，進而以該座標組為基準應用平行軸原理。",
+        "empty_warning": "目前截面中無幾何元件，請於左側欄位點選工程預設載入，或按「新增截面元件」手動構造複合截面！",
+        "formulas_centroid": "1. 複合形心中性軸求解步驟",
+        "formulas_moi": "2. 主軸慣性矩與平行軸修正 (Ix, Iy)",
+        "theory_text": "本系統基於材料力學平行軸定理公式計算：$I = I_{0} + A d^2$。其中 $I_{0}$ 是子幾何繞自身二次形心軸的局部慣性矩，$d$ 是其中心至全截面形心中性軸之垂直距離。"
+    }
 }
+
+# Default preset sections
+def get_presets_data():
+    return {
+        "rectangle": {
+            "nameZh": "單一實心矩形",
+            "nameEn": "Solid Rectangle",
+            "descZh": "最基礎的截面，形心位於幾何中心。Ix = b·h³/12, Iy = h·b³/12。",
+            "descEn": "The most basic section with centroid at geometric center. Ix = bh³/12, Iy = hb³/12.",
+            "shapes": [
+                {
+                    "id": "rect_1",
+                    "name": "Main Plate / 主板件",
+                    "type": "rectangle",
+                    "width": 60.0,
+                    "height": 100.0,
+                    "radius": 0.0,
+                    "cx": 0.0,
+                    "cy": 0.0,
+                    "isHole": False
+                }
+            ]
+        },
+        "box": {
+            "nameZh": "空心箱型截面",
+            "nameEn": "Hollow Box Section",
+            "descZh": "中空結構，常用於梁柱，透過一鍵設定中空箱元件，外框寬度高與其壁厚進行矩形管剛度抵消。",
+            "descEn": "Hollow structural section (HSS), featuring full double-symmetric outer boundaries minus local hollow core thickness.",
+            "shapes": [
+                {
+                    "id": "box_1",
+                    "name": "Hollow Box / 矩形箱管",
+                    "type": "hollowrect",
+                    "width": 80.0,
+                    "height": 80.0,
+                    "radius": 0.0,
+                    "cx": 0.0,
+                    "cy": 0.0,
+                    "isHole": False,
+                    "thickness": 6.0
+                }
+            ]
+        },
+        "ibeam": {
+            "nameZh": "工字鋼 (I型雙對稱)",
+            "nameEn": "I-Beam (Universal Section)",
+            "descZh": "效率極高的抗彎截面，本系統支持直接原生工字型件（設定腹板與翼厚），省卻三個拼合板逐片校準的麻煩！",
+            "descEn": "Composed of Top Flange, Web, and Bottom Flange. Highly optimized for bending in structural steel framing.",
+            "shapes": [
+                {
+                    "id": "ibeam_1",
+                    "name": "I-Section / 標準工型件",
+                    "type": "ibeam",
+                    "width": 0.0,
+                    "height": 120.0,
+                    "radius": 0.0,
+                    "cx": 0.0,
+                    "cy": 0.0,
+                    "isHole": False,
+                    "fWidth": 90.0,
+                    "fThickness": 15.0,
+                    "wThickness": 12.0
+                }
+            ]
+        },
+        "tsection": {
+            "nameZh": "T型鋼 (單軸對稱)",
+            "nameEn": "T-Section",
+            "descZh": "非對稱截面，由翼板與腹板拼合，形心會偏向高剛性的翼板一側（偏離中心線）。",
+            "descEn": "Asymmetrical flanged profile with single-axis symmetry where centroid is biased naturally towards flanged side.",
+            "shapes": [
+                {
+                    "id": "tsec_1",
+                    "name": "T-Beam / T型元件",
+                    "type": "tsection",
+                    "width": 0.0,
+                    "height": 100.0,
+                    "radius": 0.0,
+                    "cx": 0.0,
+                    "cy": 0.0,
+                    "isHole": False,
+                    "fWidth": 90.0,
+                    "fThickness": 16.0,
+                    "wThickness": 16.0
+                }
+            ]
+        },
+        "composite_hole": {
+            "nameZh": "矩形孔洞抵消組合",
+            "nameEn": "Solid Block with Hole cutout",
+            "descZh": "展示將外矩形實體件（60x100）在中心正上方偏移 25mm 軸位置減去一個半徑 15mm 圓形孔洞的負剛性組合。",
+            "descEn": "Illustrates custom parallel compound subtracting a circular void representing an eccentric hole cutout.",
+            "shapes": [
+                {
+                    "id": "comp_plate",
+                    "name": "Solid Plate / 外實心矩骨",
+                    "type": "rectangle",
+                    "width": 80.0,
+                    "height": 100.0,
+                    "radius": 0.0,
+                    "cx": 0.0,
+                    "cy": 0.0,
+                    "isHole": False
+                },
+                {
+                    "id": "comp_void",
+                    "name": "Circular Hole / 扣除圓孔",
+                    "type": "circle",
+                    "width": 0.0,
+                    "height": 0.0,
+                    "radius": 20.0,
+                    "cx": 10.0,
+                    "cy": 20.0,
+                    "isHole": True
+                }
+            ]
+        }
+    }
+
+# ----------------- SESSION STATE INITS -----------------
+if "shapes" not in st.session_state:
+    # Warm initialization with Standard I-Beam preset
+    preset_data = get_presets_data()
+    st.session_state.shapes = [dict(s) for s in preset_data["ibeam"]["shapes"]]
+if "prev_preset_sel" not in st.session_state:
+    st.session_state.prev_preset_sel = "ibeam"
+
+# ----------------- MATH CORE ENGINE -----------------
+def calculate_section_properties(shapes):
+    if not shapes:
+        return {
+            "centroid": {
+                "x": 0.0,
+                "y": 0.0,
+                "totalArea": 0.0,
+                "steps": {
+                    "totalAreaFormula": "∑A_i = 0",
+                    "totalAreaVal": 0.0,
+                    "sumAx": 0.0,
+                    "sumAy": 0.0,
+                    "xBarFormula": "X̄ = 0",
+                    "yBarFormula": "Ȳ = 0"
+                }
+            },
+            "rows": [],
+            "totalIx": 0.0,
+            "totalIy": 0.0,
+            "rx": 0.0,
+            "ry": 0.0
+        }
+        
+    totalArea = 0.0
+    sumAx = 0.0
+    sumAy = 0.0
+    rows = []
+    
+    for shape in shapes:
+        area = 0.0
+        ix0 = 0.0
+        iy0 = 0.0
+        ix0Formula = ""
+        iy0Formula = ""
+        
+        sign = -1.0 if shape.get('isHole', False) else 1.0
+        t = shape['type']
+        
+        if t == 'rectangle':
+            w = float(shape['width'])
+            h = float(shape['height'])
+            area = w * h
+            ix0 = (w * (h ** 3)) / 12.0
+            iy0 = (h * (w ** 3)) / 12.0
+            ix0Formula = f"(b·h³)/12 = ({w:.1f}·{h:.1f}³)/12"
+            iy0Formula = f"(h·b³)/12 = ({h:.1f}·{w:.1f}³)/12"
+            
+        elif t == 'circle':
+            r = float(shape['radius'])
+            area = math.pi * (r ** 2)
+            ix0 = (math.pi * (r ** 4)) / 4.0
+            iy0 = ix0
+            ix0Formula = f"(π·r⁴)/4 = (π·{r:.1f}⁴)/4"
+            iy0Formula = f"(π·r⁴)/4 = (π·{r:.1f}⁴)/4"
+            
+        elif t == 'ibeam':
+            bf = float(shape.get('fWidth', 80.0))
+            h = float(shape['height'])
+            tf = float(shape.get('fThickness', 15.0))
+            tw = float(shape.get('wThickness', 12.0))
+            hw = max(1.0, h - 2.0 * tf)
+            
+            area = 2.0 * bf * tf + hw * tw
+            ix0 = (bf * (h ** 3)) / 12.0 - ((bf - tw) * (hw ** 3)) / 12.0
+            iy0 = (2.0 * tf * (bf ** 3)) / 12.0 + (hw * (tw ** 3)) / 12.0
+            ix0Formula = f"[(bf·h³)-(bf-tw)·hw³]/12 = [({bf:.1f}·{h:.1f}³)-({bf-tw:.1f})·{hw:.1f}³]/12"
+            iy0Formula = f"[2·tf·bf³+hw·tw³]/12 = [2·{tf:.1f}·{bf:.1f}³+{hw:.1f}·{tw:.1f}³]/12"
+            
+        elif t == 'tsection':
+            bf = float(shape.get('fWidth', 90.0))
+            h = float(shape['height'])
+            tf = float(shape.get('fThickness', 16.0))
+            tw = float(shape.get('wThickness', 16.0))
+            hw = max(1.0, h - tf)
+            
+            Af = bf * tf
+            Aw = tw * hw
+            area = Af + Aw
+            
+            # Local centroid relative to bottom edge of stem
+            yBase = (Aw * (hw / 2.0) + Af * (hw + tf / 2.0)) / area if area > 0 else 0
+            df = (hw + tf / 2.0) - yBase
+            dw = yBase - hw / 2.0
+            
+            ix0 = ((bf * (tf ** 3)) / 12.0 + Af * (df ** 2)) + ((tw * (hw ** 3)) / 12.0 + Aw * (dw ** 2))
+            iy0 = (tf * (bf ** 3)) / 12.0 + (hw * (tw ** 3)) / 12.0
+            ix0Formula = f"∑(I_i0+A·d²) = [({bf:.1f}·{tf:.1f}³)/12+{Af:.1f}·{df:.1f}²]+[({tw:.1f}·{hw:.1f}³)/12+{Aw:.1f}·{dw:.1f}²]"
+            iy0Formula = f"[tf·bf³+hw·tw³]/12 = [{tf:.1f}·{bf:.1f}³+{hw:.1f}·{tw:.1f}³]/12"
+            
+        elif t == 'hollowrect':
+            b = float(shape['width'])
+            h = float(shape['height'])
+            th = float(shape.get('thickness', 6.0))
+            bi = max(1.0, b - 2.0 * th)
+            hi = max(1.0, h - 2.0 * th)
+            
+            area = b * h - bi * hi
+            ix0 = (b * (h ** 3)) / 12.0 - (bi * (hi ** 3)) / 12.0
+            iy0 = (h * (b ** 3)) / 12.0 - (hi * (bi ** 3)) / 12.0
+            ix0Formula = f"(b·h³-bi·hi³)/12 = ({b:.1f}·{h:.1f}³-{bi:.1f}·{hi:.1f}³)/12"
+            iy0Formula = f"(h·b³-hi·bi³)/12 = ({h:.1f}·{b:.1f}³-{hi:.1f}·{bi:.1f}³)/12"
+            
+        elif t == 'hollowcircle':
+            R = float(shape['radius'])
+            th = float(shape.get('thickness', 6.0))
+            r = max(1.0, R - th)
+            
+            area = math.pi * (R**2 - r**2)
+            ix0 = (math.pi * (R**4 - r**4)) / 4.0
+            iy0 = ix0
+            ix0Formula = f"π(R⁴-r⁴)/4 = π({R:.1f}⁴-{r:.1f}⁴)/4"
+            iy0Formula = f"π(R⁴-r⁴)/4 = π({R:.1f}⁴-{r:.1f}⁴)/4"
+            
+        signedArea = sign * area
+        signedIx0 = sign * ix0
+        signedIy0 = sign * iy0
+        
+        totalArea += signedArea
+        sumAx += signedArea * shape['cx']
+        sumAy += signedArea * shape['cy']
+        
+        rows.append({
+            'id': shape['id'],
+            'name': shape['name'],
+            'type': shape['type'],
+            'isHole': shape.get('isHole', False),
+            'area': signedArea,
+            'cx': shape['cx'],
+            'cy': shape['cy'],
+            'ix0': signedIx0,
+            'iy0': signedIy0,
+            'ix0Formula': ix0Formula,
+            'iy0Formula': iy0Formula,
+            'dx': 0.0,
+            'dy': 0.0,
+            'adx2': 0.0,
+            'ady2': 0.0,
+            'ixTotal': 0.0,
+            'iyTotal': 0.0
+        })
+        
+    xBar = sumAx / totalArea if totalArea != 0 else 0.0
+    yBar = sumAy / totalArea if totalArea != 0 else 0.0
+    
+    formula_parts = []
+    for s in shapes:
+        sign_char = '-' if s.get('isHole', False) else '+'
+        tp = s['type']
+        if tp == 'rectangle':
+            formula_parts.append(f"{sign_char}({s['width']:.1f}×{s['height']:.1f})")
+        elif tp == 'circle':
+            formula_parts.append(f"{sign_char}(π×{s['radius']:.1f}²)")
+        elif tp == 'ibeam':
+            formula_parts.append(f"{sign_char}(IBeam)")
+        elif tp == 'tsection':
+            formula_parts.append(f"{sign_char}(TSection)")
+        elif tp == 'hollowrect':
+            formula_parts.append(f"{sign_char}(HollowBox)")
+        elif tp == 'hollowcircle':
+            formula_parts.append(f"{sign_char}(HollowPipe)")
+        else:
+            formula_parts.append(f"{sign_char}A")
+            
+    totalAreaFormula = " ".join(formula_parts)
+    # Strip leading plus
+    if totalAreaFormula.startswith('+'):
+        totalAreaFormula = totalAreaFormula[1:]
+        
+    xBarFormula = f"X_G = \\frac{{\\sum (A_i \\cdot cx_i)}}{{\\sum A_i}} = \\frac{{{sumAx:.1f}}}{{{totalArea:.1f}}}"
+    yBarFormula = f"Y_G = \\frac{{\\sum (A_i \\cdot cy_i)}}{{\\sum A_i}} = \\frac{{{sumAy:.1f}}}{{{totalArea:.1f}}}"
+    
+    centroid_result = {
+        'x': xBar,
+        'y': yBar,
+        'totalArea': totalArea,
+        'steps': {
+            'totalAreaFormula': totalAreaFormula if totalAreaFormula else "0.0",
+            'totalAreaVal': totalArea,
+            'sumAx': sumAx,
+            'sumAy': sumAy,
+            'xBarFormula': xBarFormula,
+            'yBarFormula': yBarFormula
+        }
+    }
+    
+    totalIx = 0.0
+    totalIy = 0.0
+    
+    updated_rows = []
+    for row in rows:
+        sign = -1.0 if row['isHole'] else 1.0
+        # dx is horizontal offset from cx to xBar (used in Iy)
+        # dy is vertical offset from cy to yBar (used in Ix)
+        # Note standard PAT rules: Ix_total = Ix0 + Area * dy^2  --  Iy_total = Iy0 + Area * dx^2
+        dx = row['cx'] - xBar
+        dy = row['cy'] - yBar
+        
+        ady2 = sign * abs(row['area']) * (dy ** 2)
+        adx2 = sign * abs(row['area']) * (dx ** 2)
+        
+        ixTotal = row['ix0'] + ady2
+        iyTotal = row['iy0'] + adx2
+        
+        totalIx += ixTotal
+        totalIy += iyTotal
+        
+        # we label offset distance:
+        row['dx'] = dx
+        row['dy'] = dy
+        row['adx2'] = adx2 # term relative to Y axis offset, added to Iy
+        row['ady2'] = ady2 # term relative to X axis offset, added to Ix
+        row['ixTotal'] = ixTotal
+        row['iyTotal'] = iyTotal
+        updated_rows.append(row)
+        
+    rx = math.sqrt(totalIx / totalArea) if (totalIx > 0 and totalArea > 0) else 0.0
+    ry = math.sqrt(totalIy / totalArea) if (totalIy > 0 and totalArea > 0) else 0.0
+    
+    return {
+        "centroid": centroid_result,
+        "rows": updated_rows,
+        "totalIx": totalIx,
+        "totalIy": totalIy,
+        "rx": rx,
+        "ry": ry
+    }
+
+# ----------------- COORDINATE VISUALIZER BOUNDS -----------------
+def calculate_bounds(shapes, x_bar, y_bar):
+    if not shapes:
+        return {"minX": -50.0, "maxX": 50.0, "minY": -50.0, "maxY": 50.0}
+    
+    minX = float('inf')
+    maxX = float('-inf')
+    minY = float('inf')
+    maxY = float('-inf')
+    
+    for shape in shapes:
+        t = shape['type']
+        cx = shape['cx']
+        cy = shape['cy']
+        
+        if t in ('rectangle', 'hollowrect'):
+            halfW = shape['width'] / 2.0
+            halfH = shape['height'] / 2.0
+            minX = min(minX, cx - halfW)
+            maxX = max(maxX, cx + halfW)
+            minY = min(minY, cy - halfH)
+            maxY = max(maxY, cy + halfH)
+        elif t in ('circle', 'hollowcircle'):
+            r = shape['radius']
+            minX = min(minX, cx - r)
+            maxX = max(maxX, cx + r)
+            minY = min(minY, cy - r)
+            maxY = max(maxY, cy + r)
+        elif t in ('ibeam', 'tsection'):
+            halfW = shape.get('fWidth', 80.0) / 2.0
+            halfH = shape['height'] / 2.0
+            minX = min(minX, cx - halfW)
+            maxX = max(maxX, cx + halfW)
+            minY = min(minY, cy - halfH)
+            maxY = max(maxY, cy + halfH)
+            
+    minX = min(minX, x_bar)
+    maxX = max(maxX, x_bar)
+    minY = min(minY, y_bar)
+    maxY = max(maxY, y_bar)
+    
+    if minX == maxX:
+        minX -= 10.0
+        maxX += 10.0
+    if minY == maxY:
+        minY -= 10.0
+        maxY += 10.0
+        
+    dx = maxX - minX
+    dy = maxY - minY
+    minX -= dx * 0.18
+    maxX += dx * 0.18
+    minY -= dy * 0.18
+    maxY += dy * 0.18
+    
+    return {"minX": minX, "maxX": maxX, "minY": minY, "maxY": maxY}
+
+# ----------------- VECTOR SVG ENERGETICAL DRAWER -----------------
+def generate_interactive_svg(shapes, centroid_res, bounds):
+    canvasWidth = 400
+    canvasHeight = 400
+    padding = 40
+    
+    x_bar = centroid_res['x']
+    y_bar = centroid_res['y']
+    
+    physW = bounds['maxX'] - bounds['minX']
+    physH = bounds['maxY'] - bounds['minY']
+    
+    scaleX = (canvasWidth - padding * 2) / physW if physW > 0 else 1.0
+    scaleY = (canvasHeight - padding * 2) / physH if physH > 0 else 1.0
+    scale = min(scaleX, scaleY)
+    
+    physCx = (bounds['minX'] + bounds['maxX']) / 2.0
+    physCy = (bounds['minY'] + bounds['maxY']) / 2.0
+    
+    svgCx = canvasWidth / 2.0
+    svgCy = canvasHeight / 2.0
+    
+    def toSvgX(x):
+        return svgCx + (x - physCx) * scale
+        
+    def toSvgY(y):
+        return svgCy - (y - physCy) * scale
+        
+    def toSvgDist(d):
+        return d * scale
+
+    rangeX = bounds['maxX'] - bounds['minX']
+    if rangeX > 500: step = 100
+    elif rangeX > 250: step = 50
+    elif rangeX > 100: step = 20
+    elif rangeX > 40: step = 10
+    elif rangeX > 15: step = 5
+    else: step = 2
+    
+    xStart = math.floor(bounds['minX'] / step) * step
+    xEnd = math.ceil(bounds['maxX'] / step) * step
+    yStart = math.floor(bounds['minY'] / step) * step
+    yEnd = math.ceil(bounds['maxY'] / step) * step
+    
+    vLines = []
+    x_curr = xStart
+    while x_curr <= xEnd:
+        vLines.append(x_curr)
+        x_curr += step
+        
+    hLines = []
+    y_curr = yStart
+    while y_curr <= yEnd:
+        hLines.append(y_curr)
+        y_curr += step
+
+    svg = []
+    svg.append(f'<svg width="100%" height="100%" viewBox="0 0 {canvasWidth} {canvasHeight}" style="background-color: #030712; border: 1px solid #1f2937; border-radius: 12px; font-family: system-ui, sans-serif;">')
+    
+    # Hatch pattern definitions for voids
+    svg.append('''
+    <defs>
+      <pattern id="diagonalHatch" width="10" height="10" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+        <line x1="0" y1="0" x2="0" y2="10" stroke="#f43f5e" stroke-width="2.5" stroke-opacity="0.6" />
+      </pattern>
+    </defs>
+    ''')
+    
+    # 1. Coordinate Grid Lines
+    svg.append('<g stroke="#1e293b" stroke-width="0.8" stroke-dasharray="2,4">')
+    for x in vLines:
+        svg.append(f'<line x1="{toSvgX(x)}" y1="0" x2="{toSvgX(x)}" y2="{canvasHeight}" />')
+    for y in hLines:
+        svg.append(f'<line x1="0" y1="{toSvgY(y)}" x2="{canvasWidth}" y2="{toSvgY(y)}" />')
+    svg.append('</g>')
+    
+    # 2. X and Y Coordinate Numbers
+    svg.append('<g fill="#475569" font-size="9" font-family="monospace" font-weight="bold">')
+    for x in vLines:
+        yPos = toSvgY(0)
+        safeY = max(11.0, min(float(canvasHeight - 6), yPos + 12.0))
+        svg.append(f'<text x="{toSvgX(x)}" y="{safeY}" text-anchor="middle" opacity="0.8">{int(x) if x == int(x) else round(x, 1)}</text>')
+    for y in hLines:
+        xPos = toSvgX(0)
+        safeX = max(6.0, min(float(canvasWidth - 14), xPos - 8.0))
+        svg.append(f'<text x="{safeX}" y="{toSvgY(y)+3}" text-anchor="end" opacity="0.8">{int(y) if y == int(y) else round(y, 1)}</text>')
+    svg.append('</g>')
+    
+    # 3. Principal Reference Axes (0,0)
+    svg.append('<g stroke="#334155" stroke-width="1.2" opacity="0.75">')
+    svg.append(f'<line x1="0" y1="{toSvgY(0)}" x2="{canvasWidth}" y2="{toSvgY(0)}" />')
+    svg.append(f'<line x1="{toSvgX(0)}" y1="0" x2="{toSvgX(0)}" y2="{canvasHeight}" />')
+    svg.append('</g>')
+    
+    # 4. Draw geometry shape blocks (with sequences coloring)
+    for i, shape in enumerate(shapes):
+        x = toSvgX(shape['cx'])
+        y = toSvgY(shape['cy'])
+        t = shape['type']
+        isHole = shape.get('isHole', False)
+        
+        # Color palettes matching composite layers
+        fill = "url(#diagonalHatch)" if isHole else "#10b981" if i == 0 else "#3b82f6" if i == 1 else "#8b5cf6" if i == 2 else "#ec4899"
+        fill_opacity = "1.0" if isHole else "0.22"
+        stroke = "#f43f5e" if isHole else "#059669" if i == 0 else "#2563eb" if i == 1 else "#7c3aed" if i == 2 else "#db2777"
+        stroke_dash = "4,3" if isHole else "0"
+        
+        if t == 'rectangle':
+            w_s = toSvgDist(shape['width'])
+            h_s = toSvgDist(shape['height'])
+            svg.append(f'<rect x="{x - w_s/2}" y="{y - h_s/2}" width="{w_s}" height="{h_s}" rx="2" fill="{fill}" fill-opacity="{fill_opacity}" stroke="{stroke}" stroke-width="2.0" stroke-dasharray="{stroke_dash}" />')
+            
+        elif t == 'circle':
+            r_s = toSvgDist(shape['radius'])
+            svg.append(f'<circle cx="{x}" cy="{y}" r="{r_s}" fill="{fill}" fill-opacity="{fill_opacity}" stroke="{stroke}" stroke-width="2.0" stroke-dasharray="{stroke_dash}" />')
+            
+        elif t == 'ibeam':
+            bf = shape.get('fWidth', 80.0)
+            h = shape['height']
+            tf = shape.get('fThickness', 15.0)
+            tw = shape.get('wThickness', 12.0)
+            
+            bf_s = toSvgDist(bf)
+            h_s = toSvgDist(h)
+            tf_s = toSvgDist(tf)
+            tw_s = toSvgDist(tw)
+            
+            path_d = f"M {x - bf_s / 2} {y - h_s / 2} H {x + bf_s / 2} V {y - h_s / 2 + tf_s} H {x + tw_s / 2} V {y + h_s / 2 - tf_s} H {x + bf_s / 2} V {y + h_s / 2} H {x - bf_s / 2} V {y + h_s / 2 - tf_s} H {x - tw_s / 2} V {y - h_s / 2 + tf_s} H {x - bf_s / 2} Z"
+            svg.append(f'<path d="{path_d}" fill="{fill}" fill-opacity="{fill_opacity}" stroke="{stroke}" stroke-width="2.0" stroke-dasharray="{stroke_dash}" />')
+            
+        elif t == 'tsection':
+            bf = shape.get('fWidth', 90.0)
+            h = shape['height']
+            tf = shape.get('fThickness', 16.0)
+            tw = shape.get('wThickness', 16.0)
+            hw = max(1.0, h - tf)
+            
+            Af = bf * tf
+            Aw = tw * hw
+            yBase = (Aw * (hw / 2.0) + Af * (hw + tf / 2.0)) / (Af + Aw) if (Af + Aw) > 0 else 0
+            
+            bf_s = toSvgDist(bf)
+            h_s = toSvgDist(h)
+            tf_s = toSvgDist(tf)
+            tw_s = toSvgDist(tw)
+            hw_s = toSvgDist(hw)
+            yBase_s = toSvgDist(yBase)
+            
+            path_d = f"M {x - bf_s / 2} {y - (h_s - yBase_s)} H {x + bf_s / 2} V {y - (hw_s - yBase_s)} H {x + tw_s / 2} V {y + yBase_s} H {x - tw_s / 2} V {y - (hw_s - yBase_s)} H {x - bf_s / 2} Z"
+            svg.append(f'<path d="{path_d}" fill="{fill}" fill-opacity="{fill_opacity}" stroke="{stroke}" stroke-width="2.0" stroke-dasharray="{stroke_dash}" />')
+            
+        elif t == 'hollowrect':
+            b = shape['width']
+            h = shape['height']
+            th = shape.get('thickness', 6.0)
+            bi = max(1.0, b - 2.0 * th)
+            hi = max(1.0, h - 2.0 * th)
+            
+            b_s = toSvgDist(b)
+            h_s = toSvgDist(h)
+            bi_s = toSvgDist(bi)
+            hi_s = toSvgDist(hi)
+            
+            path_d = f"M {x - b_s / 2} {y - h_s / 2} h {b_s} v {h_s} h {-b_s} Z M {x - bi_s / 2} {y - hi_s / 2} h {bi_s} v {hi_s} h {-bi_s} Z"
+            svg.append(f'<path d="{path_d}" fill="{fill}" fill-opacity="{fill_opacity}" stroke="{stroke}" stroke-width="2.0" fill-rule="evenodd" stroke-dasharray="{stroke_dash}" />')
+            
+        elif t == 'hollowcircle':
+            R = shape['radius']
+            th = shape.get('thickness', 6.0)
+            r = max(1.0, R - th)
+            
+            R_s = toSvgDist(R)
+            r_s = toSvgDist(r)
+            
+            path_d = f"M {x} {y - R_s} A {R_s} {R_s} 0 1 0 {x} {y + R_s} A {R_s} {R_s} 0 1 0 {x} {y - R_s} Z M {x} {y - r_s} A {r_s} {r_s} 0 1 1 {x} {y + r_s} A {r_s} {r_s} 0 1 1 {x} {y - r_s} Z"
+            svg.append(f'<path d="{path_d}" fill="{fill}" fill-opacity="{fill_opacity}" stroke="{stroke}" stroke-width="2.0" fill-rule="evenodd" stroke-dasharray="{stroke_dash}" />')
+
+        # Tag local subshape sequence
+        svg.append(f'<circle cx="{x}" cy="{y}" r="2" fill="#94a3b8" />')
+        svg.append(f'<text x="{x + 6}" y="{y - 5}" fill="#94a3b8" font-size="9" font-family="monospace">#{i+1}</text>')
+
+    # 5. Global Neutral Axes (dashed gold paths)
+    svg.append('<g stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.85">')
+    # Horizontal line through global yBar
+    svg.append(f'<line x1="0" y1="{toSvgY(y_bar)}" x2="{canvasWidth}" y2="{toSvgY(y_bar)}" />')
+    # Vertical line through global xBar
+    svg.append(f'<line x1="{toSvgX(x_bar)}" y1="0" x2="{toSvgX(x_bar)}" y2="{canvasHeight}" />')
+    svg.append('</g>')
+
+    # 6. Distinctive Centroid Icon (+ standard)
+    cx_s = toSvgX(x_bar)
+    cy_s = toSvgY(y_bar)
+    svg.append(f'<g stroke="#f59e0b" stroke-width="2.5">')
+    svg.append(f'<line x1="{cx_s - 9}" y1="{cy_s}" x2="{cx_s + 9}" y2="{cy_s}" />')
+    svg.append(f'<line x1="{cx_s}" y1="{cy_s - 9}" x2="{cx_s}" y2="{cy_s + 9}" />')
+    svg.append('</g>')
+    svg.append(f'<circle cx="{cx_s}" cy="{cy_s}" r="3" fill="#f59e0b" stroke="#ffffff" stroke-width="1" />')
+    
+    # Legend scale text
+    svg.append(f'<text x="12" y="380" fill="#64748b" font-size="10" font-family="monospace" font-weight="bold">Scale: 1px = {1.0/scale:.2f} mm</text>')
+    
+    svg.append('</svg>')
+    return "".join(svg)
+
+
+# ----------------- SIDEBAR CONTROLS & SELECTION -----------------
+with st.sidebar:
+    # 1. Dual language dropdown
+    lang_sel = st.selectbox(
+        "Language / 語言", 
+        ["English", "繁體中文"], 
+        index=0
+    )
+    vocab = L[lang_sel]
+    
+    st.markdown("---")
+    
+    # 2. Section preset selection
+    st.subheader(vocab["preset_sec"])
+    presets_data = get_presets_data()
+    
+    preset_opt_keys = list(presets_data.keys())
+    preset_opt_labels = [
+        presets_data[k]["nameEn"] if lang_sel == "English" else presets_data[k]["nameZh"]
+        for k in preset_opt_keys
+    ]
+    
+    # Append a manual option
+    preset_opt_keys.append("custom")
+    preset_opt_labels.append(vocab["custom_label"])
+    
+    preset_sel = st.selectbox(
+        vocab["preset_label"],
+        options=preset_opt_keys,
+        format_func=lambda x: vocab["custom_label"] if x == "custom" else (presets_data[x]["nameEn"] if lang_sel == "English" else presets_data[x]["nameZh"]),
+        index=2 # default to I-Beam
+    )
+    
+    # Check if selected preset changed. If so, reset shape state
+    if preset_sel != st.session_state.prev_preset_sel:
+        if preset_sel != "custom":
+            st.session_state.shapes = [dict(s) for s in presets_data[preset_sel]["shapes"]]
+            st.sidebar.success(vocab["preset_loaded"].format(
+                presets_data[preset_sel]["nameEn"] if lang_sel == "English" else presets_data[preset_sel]["nameZh"]
+            ))
+        st.session_state.prev_preset_sel = preset_sel
+
+    # Display preset descriptive info
+    if preset_sel != "custom":
+        st.caption(
+            presets_data[preset_sel]["descEn"] if lang_sel == "English" else presets_data[preset_sel]["descZh"]
+        )
+        
+    st.markdown("---")
+    
+    # 3. Quick-Add customized geometries button
+    st.subheader(vocab["add_shape_sec"])
+    add_type = st.selectbox(
+        vocab["add_shape_lbl"],
+        options=["rectangle", "circle", "ibeam", "tsection", "hollowrect", "hollowcircle"],
+        format_func=lambda t: {
+            "rectangle": "Rectangle" if lang_sel == "English" else "矩形元件",
+            "circle": "Circle" if lang_sel == "English" else "圓形元件",
+            "ibeam": "I-Beam" if lang_sel == "English" else "工字型元件 (I-Section)",
+            "tsection": "T-Section" if lang_sel == "English" else "T型截面元件",
+            "hollowrect": "Hollow Box" if lang_sel == "English" else "中空箱型管",
+            "hollowcircle": "Hollow Pipe" if lang_sel == "English" else "中空圓管件"
+        }[t]
+    )
+    
+    if st.button(vocab["add_btn_text"], use_container_width=True):
+        new_id = str(uuid.uuid4())[:8]
+        new_shape = {
+            "id": f"shape_{new_id}",
+            "name": f"Block #{len(st.session_state.shapes) + 1}",
+            "type": add_type,
+            "width": 60.0 if add_type in ("rectangle", "hollowrect") else 0.0,
+            "height": 60.0 if add_type in ("rectangle", "ibeam", "tsection", "hollowrect") else 0.0,
+            "radius": 30.0 if add_type in ("circle", "hollowcircle") else 0.0,
+            "cx": 0.0,
+            "cy": 0.0,
+            "isHole": False,
+            "fWidth": 70.0 if add_type in ("ibeam", "tsection") else 0.0,
+            "fThickness": 12.0 if add_type in ("ibeam", "tsection") else 0.0,
+            "wThickness": 10.0 if add_type in ("ibeam", "tsection") else 0.0,
+            "thickness": 5.0 if add_type in ("hollowrect", "hollowcircle") else 0.0
+        }
+        st.session_state.shapes.append(new_shape)
+        st.session_state.prev_preset_sel = "custom" # Shift to custom category automatically
+        st.rerun()
+
+# ----------------- MAIN DISPLAY SCREEN Layout -----------------
+st.title(vocab["title"])
+st.caption(vocab["sub"])
+
+# Calculate engine active values
+res = calculate_section_properties(st.session_state.shapes)
+xBar = res["centroid"]["x"]
+yBar = res["centroid"]["y"]
+
+col_editor, col_visual = st.columns([13, 11], gap="medium")
+
+# --------------- COLUMN 1: INTERACTIVE STRUCTURE EDITOR ---------------
+with col_editor:
+    st.subheader(vocab["shape_list_sec"])
+    
+    if not st.session_state.shapes:
+        st.info(vocab["empty_warning"])
+    else:
+        # Loop over shapes to render controls
+        for index, shape in enumerate(st.session_state.shapes):
+            s_id = shape["id"]
+            title_name = f"#{index + 1}: {shape['name']} ({shape['type'].upper()})"
+            is_hole = shape.get("isHole", False)
+            
+            # Show customized header reflecting void states
+            label_state = f" 🔴 [VOID]" if is_hole else " 🟢 [SOLID]"
+            expander_title = f"{title_name}{label_state}"
+            
+            with st.expander(expander_title, expanded=(index == len(st.session_state.shapes) - 1)):
+                # Row 1: Label and Solid vs Hollow
+                c1, c2 = st.columns([3, 3])
+                with c1:
+                    sh_name = st.text_input(
+                        vocab["name_lbl"],
+                        value=shape["name"],
+                        key=f"name_{s_id}"
+                    )
+                    st.session_state.shapes[index]["name"] = sh_name
+                with c2:
+                    is_h_val = st.selectbox(
+                        vocab["is_hole_lbl"],
+                        options=[False, True],
+                        format_func=lambda x: vocab["hole_opt"] if x else vocab["solid_opt"],
+                        index=1 if is_hole else 0,
+                        key=f"is_hole_sel_{s_id}"
+                    )
+                    st.session_state.shapes[index]["isHole"] = is_h_val
+                
+                # Row 2: Center coordinate alignment
+                st.markdown(f"**{vocab['pos_sec']}**")
+                cx1, cx2 = st.columns([3, 3])
+                with cx1:
+                    sh_cx = st.number_input(
+                        vocab["cx_lbl"],
+                        value=float(shape["cx"]),
+                        step=5.0,
+                        key=f"cx_{s_id}"
+                    )
+                    st.session_state.shapes[index]["cx"] = sh_cx
+                with cx2:
+                    sh_cy = st.number_input(
+                        vocab["cy_lbl"],
+                        value=float(shape["cy"]),
+                        step=5.0,
+                        key=f"cy_{s_id}"
+                    )
+                    st.session_state.shapes[index]["cy"] = sh_cy
+                
+                # Row 3: Advanced dimension variables
+                st.markdown(f"**{vocab['dim_sec']}**")
+                t = shape["type"]
+                
+                if t == "rectangle":
+                    d1, d2 = st.columns([3, 3])
+                    with d1:
+                        w_v = st.number_input(
+                            vocab["b_mm"], value=float(shape["width"]), min_value=1.0, step=1.0, key=f"wid_{s_id}"
+                        )
+                        st.session_state.shapes[index]["width"] = w_v
+                    with d2:
+                        h_v = st.number_input(
+                            vocab["h_mm"], value=float(shape["height"]), min_value=1.0, step=1.0, key=f"hei_{s_id}"
+                        )
+                        st.session_state.shapes[index]["height"] = h_v
+                        
+                elif t == "circle":
+                    r_v = st.number_input(
+                        vocab["r_mm"], value=float(shape["radius"]), min_value=1.0, step=1.0, key=f"rad_{s_id}"
+                    )
+                    st.session_state.shapes[index]["radius"] = r_v
+                    
+                elif t in ("ibeam", "tsection"):
+                    d1, d2 = st.columns([3, 3])
+                    with d1:
+                        h_v = st.number_input(
+                            vocab["h_mm"], value=float(shape["height"]), min_value=1.0, step=1.0, key=f"ibe_h_{s_id}"
+                        )
+                        st.session_state.shapes[index]["height"] = h_v
+                    with d2:
+                        bf_v = st.number_input(
+                            vocab["bf_mm"], value=float(shape.get("fWidth", 80.0)), min_value=1.0, step=1.0, key=f"ibe_bf_{s_id}"
+                        )
+                        st.session_state.shapes[index]["fWidth"] = bf_v
+                        
+                    d3, d4 = st.columns([3, 3])
+                    with d3:
+                        tf_v = st.number_input(
+                            vocab["tf_mm"], value=float(shape.get("fThickness", 12.0)), min_value=1.0, step=1.0, key=f"ibe_tf_{s_id}"
+                        )
+                        st.session_state.shapes[index]["fThickness"] = tf_v
+                    with d4:
+                        tw_v = st.number_input(
+                            vocab["tw_mm"], value=float(shape.get("wThickness", 10.0)), min_value=1.0, step=1.0, key=f"ibe_tw_{s_id}"
+                        )
+                        st.session_state.shapes[index]["wThickness"] = tw_v
+                        
+                elif t == "hollowrect":
+                    d1, d2 = st.columns([3, 3])
+                    with d1:
+                        w_v = st.number_input(
+                            vocab["b_mm"], value=float(shape["width"]), min_value=1.0, step=1.0, key=f"hol_w_{s_id}"
+                        )
+                        st.session_state.shapes[index]["width"] = w_v
+                    with d2:
+                        h_v = st.number_input(
+                            vocab["h_mm"], value=float(shape["height"]), min_value=1.0, step=1.0, key=f"hol_h_{s_id}"
+                        )
+                        st.session_state.shapes[index]["height"] = h_v
+                        
+                    th_v = st.number_input(
+                        vocab["t_mm"], value=float(shape.get("thickness", 6.0)), min_value=0.5, step=1.0, key=f"hol_t_{s_id}"
+                    )
+                    st.session_state.shapes[index]["thickness"] = th_v
+                    
+                elif t == "hollowcircle":
+                    d1, d2 = st.columns([3, 3])
+                    with d1:
+                        R_v = st.number_input(
+                            vocab["R_mm"], value=float(shape["radius"]), min_value=1.0, step=1.0, key=f"hc_R_{s_id}"
+                        )
+                        st.session_state.shapes[index]["radius"] = R_v
+                    with d2:
+                        th_v = st.number_input(
+                            vocab["t_mm"], value=float(shape.get("thickness", 6.0)), min_value=0.5, step=1.0, key=f"hc_t_{s_id}"
+                        )
+                        st.session_state.shapes[index]["thickness"] = th_v
+                
+                # Delete element control
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button(f"🗑️ {vocab['delete']} ({shape['name']})", key=f"del_{s_id}", use_container_width=True):
+                    st.session_state.shapes.pop(index)
+                    st.session_state.prev_preset_sel = "custom"
+                    st.rerun()
+
+# --------------- COLUMN 2: VECTOR CANVAS SHOWCASE & PLOTTER ---------------
+with col_visual:
+    st.subheader(vocab["canvas_title"])
+    st.caption(vocab["scale_desc"])
+    
+    # Live vector SVG compiling
+    bounds = calculate_bounds(st.session_state.shapes, xBar, yBar)
+    svg_canvas_code = generate_interactive_svg(st.session_state.shapes, res, bounds)
+    
+    # HTML component rendering insideStreamlit preserving margins
+    import streamlit.components.v1 as components
+    components.html(svg_canvas_code, height=415, scrolling=False)
+    
+    st.markdown(f"<p style='color:#64748b; font-size:11px; font-style:italic; line-height:1.2; text-align:center;'>{vocab['theory_text']}</p>", unsafe_allow_html=True)
+
+
+# ==============================================================================
+#                 COMPREHENSIVE TAB DATA ANALYSIS & METRICS
+# ==============================================================================
+st.markdown("---")
+
+# Tab definition
+tab_summary, tab_centroid, tab_pat = st.tabs([
+    vocab["tab_summary"], 
+    vocab["tab_centroid_steps"], 
+    vocab["tab_pat_steps"]
+])
+
+# ----------------- TAB A: RESULT SUMMARY -----------------
+with tab_summary:
+    # 2x3 Metric Cards Grid
+    grid_r1_c1, grid_r1_c2, grid_r1_c3 = st.columns([1, 1, 1])
+    grid_r2_c1, grid_r2_c2, grid_r2_c3 = st.columns([1, 1, 1])
+    
+    with grid_r1_c1:
+        st.markdown(f"""
+        <div class="metric-card" style="border-left-color: #10b981;">
+            <div class="metric-title">{vocab["total_area"]} (A)</div>
+            <div class="metric-value">{res["centroid"]["totalArea"]:,.1f}<span class="metric-unit">mm²</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with grid_r1_c2:
+        st.markdown(f"""
+        <div class="metric-card" style="border-left-color: #3b82f6;">
+            <div class="metric-title">{vocab["ix_lbl"]} (Ix)</div>
+            <div class="metric-value">{res["totalIx"]:,.1f}<span class="metric-unit">mm⁴</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with grid_r1_c3:
+        st.markdown(f"""
+        <div class="metric-card" style="border-left-color: #a855f7;">
+            <div class="metric-title">{vocab["rx_lbl"]} (rx)</div>
+            <div class="metric-value">{res["rx"]:.2f}<span class="metric-unit">mm</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with grid_r2_c1:
+        st.markdown(f"""
+        <div class="metric-card" style="border-left-color: #f59e0b;">
+            <div class="metric-title">{vocab["centroid_u"]}</div>
+            <div class="metric-value">({xBar:.2f}, {yBar:.2f})<span class="metric-unit">mm</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with grid_r2_c2:
+        st.markdown(f"""
+        <div class="metric-card" style="border-left-color: #ec4899;">
+            <div class="metric-title">{vocab["iy_lbl"]} (Iy)</div>
+            <div class="metric-value">{res["totalIy"]:,.1f}<span class="metric-unit">mm⁴</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with grid_r2_c3:
+        st.markdown(f"""
+        <div class="metric-card" style="border-left-color: #14b8a6;">
+            <div class="metric-title">{vocab["ry_lbl"]} (ry)</div>
+            <div class="metric-value">{res["ry"]:.2f}<span class="metric-unit">mm</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# ----------------- TAB B: CENTROID FORMULA STEPS (TeX Equations) -----------------
+with tab_centroid:
+    st.subheader(vocab["formulas_centroid"])
+    st.caption(vocab["steps_desc"])
+    
+    st.markdown("##### 1. Summation of Areas")
+    st.latex(rf"\sum A_i = {res['centroid']['steps']['totalAreaFormula']} = {res['centroid']['steps']['totalAreaVal']:,.1f} \text{{ mm}}^2")
+    
+    st.markdown("##### 2. First Moment of Area Sums (Weighted Displacements)")
+    st.latex(rf"\sum (A_i \cdot cx_i) = {res['centroid']['steps']['sumAx']:,.1f} \text{{ mm}}^3")
+    st.latex(rf"\sum (A_i \cdot cy_i) = {res['centroid']['steps']['sumAy']:,.1f} \text{{ mm}}^3")
+    
+    st.markdown("##### 3. Coordinate Neutral Axes location")
+    st.latex(rf"{res['centroid']['steps']['xBarFormula']} \approx {xBar:.2f} \text{{ mm}}")
+    st.latex(rf"{res['centroid']['steps']['yBarFormula']} \approx {yBar:.2f} \text{{ mm}}")
+
+# ----------------- TAB C: PARALLEL AXIS MATRIX DATAFRAME -----------------
+with tab_pat:
+    st.subheader(vocab["formulas_moi"])
+    st.caption(vocab["theory_text"])
+    
+    if res["rows"]:
+        # Build pandas dataframe representing calculations
+        data_table = []
+        for index, row in enumerate(res["rows"]):
+            lbl = f"#{index + 1}: {row['name']}"
+            data_table.append({
+                vocab["table_shape"]: lbl,
+                "Type": row["type"].upper(),
+                "Hole?": "Yes" if row["isHole"] else "No",
+                vocab["table_area"]: f"{row['area']:,.1f}",
+                vocab["table_cx"]: f"{row['cx']:.1f}",
+                vocab["table_cy"]: f"{row['cy']:.1f}",
+                "Local Ix0": f"{row['ix0']:,.1f}",
+                "Local Iy0": f"{row['iy0']:,.1f}",
+                "dy_i (Y-dist)": f"{row['dy']:.1f}",
+                "dx_i (X-dist)": f"{row['dx']:.1f}",
+                "A·dy² (Inertia Ix)": f"{row['ady2']:,.1f}",
+                "A·dx² (Inertia Iy)": f"{row['adx2']:,.1f}",
+                "Row Ix_tot": f"{row['ixTotal']:,.1f}",
+                "Row Iy_tot": f"{row['iyTotal']:,.1f}",
+            })
+            
+        df = pd.DataFrame(data_table)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        # Final combined mathematical sum display with LaTeX
+        st.markdown("**Combined Final Mechanical Integrations:**")
+        st.latex(rf"I_x = \sum (I_{{x0}} + A \cdot dy^2) = {res['totalIx']:,.1f} \text{{ mm}}^4")
+        st.latex(rf"I_y = \sum (I_{{y0}} + A \cdot dx^2) = {res['totalIy']:,.1f} \text{{ mm}}^4")
+    else:
+        st.write("---")
